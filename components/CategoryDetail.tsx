@@ -1,14 +1,35 @@
-import React from 'react';
-import { Category, Task } from '../types.ts';
+import React, { useState } from 'react';
+import { Category, Task, User } from '../types.ts';
 
 interface CategoryDetailProps {
   category: Category;
   tasks: Task[];
+  users: User[];
+  currentUser: User;
   onBack: () => void;
   onUpdateTask: (task: Task) => void;
+  onAddTask: (categoryId: string, task: Partial<Task>) => void;
+  onDeleteTask: (taskId: string) => void;
 }
 
-const CategoryDetail: React.FC<CategoryDetailProps> = ({ category, tasks, onBack, onUpdateTask }) => {
+const CategoryDetail: React.FC<CategoryDetailProps> = ({ 
+  category, 
+  tasks, 
+  users, 
+  currentUser,
+  onBack, 
+  onUpdateTask, 
+  onAddTask,
+  onDeleteTask
+}) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newTask, setNewTask] = useState<Partial<Task>>({
+    title: '',
+    description: '',
+    dueDate: new Date().toISOString().split('T')[0],
+    assignedTo: []
+  });
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-700';
@@ -18,8 +39,31 @@ const CategoryDetail: React.FC<CategoryDetailProps> = ({ category, tasks, onBack
     }
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTask.title) return;
+    onAddTask(category.id, newTask);
+    setIsModalOpen(false);
+    setNewTask({
+      title: '',
+      description: '',
+      dueDate: new Date().toISOString().split('T')[0],
+      assignedTo: []
+    });
+  };
+
+  const toggleAssignee = (name: string) => {
+    setNewTask(prev => {
+      const current = prev.assignedTo || [];
+      const next = current.includes(name) 
+        ? current.filter(n => n !== name)
+        : [...current, name];
+      return { ...prev, assignedTo: next };
+    });
+  };
+
   return (
-    <div className="space-y-6 animate-slideUp">
+    <div className="space-y-6 animate-slideUp relative">
       <button 
         onClick={onBack}
         className="flex items-center text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
@@ -77,7 +121,10 @@ const CategoryDetail: React.FC<CategoryDetailProps> = ({ category, tasks, onBack
           <div>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-slate-800">Tasks ({tasks.length})</h2>
-              <button className="text-sm bg-indigo-50 text-indigo-600 px-4 py-2 rounded-lg font-semibold hover:bg-indigo-100">
+              <button 
+                onClick={() => setIsModalOpen(true)}
+                className="text-sm bg-indigo-50 text-indigo-600 px-4 py-2 rounded-lg font-semibold hover:bg-indigo-100 transition-colors"
+              >
                 + Add Task
               </button>
             </div>
@@ -89,21 +136,33 @@ const CategoryDetail: React.FC<CategoryDetailProps> = ({ category, tasks, onBack
                       <h3 className="font-bold text-slate-800 text-lg">{task.title}</h3>
                       <p className="text-sm text-slate-500 mt-1">{task.description}</p>
                     </div>
-                    <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${getStatusBadge(task.status)}`}>
-                      {task.status.replace('-', ' ')}
-                    </span>
+                    <div className="flex flex-col items-end gap-2">
+                       <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${getStatusBadge(task.status)}`}>
+                         {task.status.replace('-', ' ')}
+                       </span>
+                       {currentUser.role === 'super-admin' && (
+                         <button 
+                           onClick={() => onDeleteTask(task.id)}
+                           className="text-[10px] font-bold text-red-400 hover:text-red-600 uppercase tracking-widest bg-red-50 px-2 py-1 rounded transition-colors"
+                         >
+                           Delete
+                         </button>
+                       )}
+                    </div>
                   </div>
                   
-                  <div className="flex items-center space-x-4 mb-4">
-                    <div className="flex -space-x-2">
-                      {task.assignedTo.map((name, i) => (
-                        <div key={i} className="w-8 h-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-600" title={name}>
-                          {name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-xs text-slate-400 font-medium">
-                      Due: {new Date(task.dueDate).toLocaleDateString('en-GB')}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex -space-x-2">
+                        {task.assignedTo.map((name, i) => (
+                          <div key={i} className="w-8 h-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-600" title={name}>
+                            {name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-xs text-slate-400 font-medium">
+                        Due: {new Date(task.dueDate).toLocaleDateString('en-GB')}
+                      </div>
                     </div>
                   </div>
 
@@ -153,6 +212,92 @@ const CategoryDetail: React.FC<CategoryDetailProps> = ({ category, tasks, onBack
           </div>
         </div>
       </div>
+
+      {/* Task Creation Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-slideUp">
+            <div className="p-6 bg-indigo-900 text-white flex justify-between items-center">
+              <h2 className="text-xl font-bold">Create New Task</h2>
+              <button onClick={() => setIsModalOpen(false)} className="hover:bg-white/10 p-2 rounded-lg transition-colors">✕</button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Task Title</label>
+                <input 
+                  autoFocus
+                  required
+                  type="text" 
+                  value={newTask.title}
+                  onChange={e => setNewTask(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="e.g. Draft invite list"
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label>
+                <textarea 
+                  value={newTask.description}
+                  onChange={e => setNewTask(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Provide more details..."
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none h-24 resize-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Due Date</label>
+                  <input 
+                    type="date" 
+                    value={newTask.dueDate}
+                    onChange={e => setNewTask(prev => ({ ...prev, dueDate: e.target.value }))}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Assign To</label>
+                <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto p-1">
+                  {users.map(u => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => toggleAssignee(u.name)}
+                      className={`
+                        px-3 py-1 rounded-full text-xs font-bold transition-all border
+                        ${newTask.assignedTo?.includes(u.name) 
+                          ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300'}
+                      `}
+                    >
+                      {u.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-4 flex space-x-3">
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalOpen(false)}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg"
+                >
+                  Create Task
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

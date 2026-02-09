@@ -1,3 +1,4 @@
+
 import { Category, Task, User, Phase } from './types.ts';
 
 export const EVENT_DATE = "2026-03-10";
@@ -10,7 +11,8 @@ export const USERS: User[] = [
   { id: '5', name: 'Dr. Usha Rani', email: 'usha@example.com', role: 'team-member', department: 'Education', password: 'password123' },
   { id: '6', name: 'Puja Munjal', email: 'puja@iitm.ac.in', role: 'admin', department: 'Strategy', password: 'password123' },
   { id: '7', name: 'Lalit Kumar', email: 'lalit@iitm.ac.in', role: 'team-member', department: 'Operations', password: 'password123' },
-  { id: '8', name: 'Ashwani Sachdeva (President)', email: 'ashwani@iitm.ac.in', role: 'admin', department: 'President Office', password: 'password123' }
+  { id: '8', name: 'Ashwani Sachdeva (President)', email: 'ashwani@iitm.ac.in', role: 'admin', department: 'President Office', password: 'password123' },
+  { id: '9', name: 'Super Admin', email: 'admin@iitm.ac.in', role: 'super-admin', department: 'Executive', password: 'admin123' }
 ];
 
 export const CATEGORIES: Category[] = [

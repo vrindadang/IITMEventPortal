@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { User } from '../types.ts';
-import { USERS } from '../constants.ts';
 
 interface LoginProps {
   onLogin: (user: User) => void;
+  users: User[];
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -25,7 +25,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
     // Simulated short delay for realism
     setTimeout(() => {
-      const user = USERS.find(u => u.id === selectedUserId);
+      const user = users.find(u => u.id === selectedUserId);
       if (user && user.password === password) {
         onLogin(user);
       } else {
@@ -59,7 +59,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all appearance-none cursor-pointer"
               >
                 <option value="" disabled>Choose your name...</option>
-                {USERS.map((user) => (
+                {users.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.id === '8' ? user.name : `${user.name} (${user.department})`}
                   </option>
