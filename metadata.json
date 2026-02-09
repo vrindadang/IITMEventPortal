@@ -1,0 +1,8 @@
+{
+  "name": "IIT-M Talk Event Management",
+  "description": "A comprehensive event management application for the IIT Madras talk on 10 March 2026, featuring task tracking, progress monitoring, and AI-driven insights.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
