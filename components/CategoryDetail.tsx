@@ -53,6 +53,7 @@ const CategoryDetail: React.FC<CategoryDetailProps> = ({
   };
 
   const toggleAssignee = (name: string) => {
+    if (currentUser.role !== 'super-admin') return;
     setNewTask(prev => {
       const current = prev.assignedTo || [];
       const next = current.includes(name) 
@@ -258,26 +259,29 @@ const CategoryDetail: React.FC<CategoryDetailProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Assign To</label>
-                <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto p-1">
-                  {users.map(u => (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => toggleAssignee(u.name)}
-                      className={`
-                        px-3 py-1 rounded-full text-xs font-bold transition-all border
-                        ${newTask.assignedTo?.includes(u.name) 
-                          ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
-                          : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300'}
-                      `}
-                    >
-                      {u.name}
-                    </button>
-                  ))}
+              {/* ONLY show assignment to Super Admin */}
+              {currentUser.role === 'super-admin' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Assign To</label>
+                  <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto p-1">
+                    {users.map(u => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => toggleAssignee(u.name)}
+                        className={`
+                          px-3 py-1 rounded-full text-xs font-bold transition-all border
+                          ${newTask.assignedTo?.includes(u.name) 
+                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
+                            : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300'}
+                        `}
+                      >
+                        {u.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="pt-4 flex space-x-3">
                 <button 

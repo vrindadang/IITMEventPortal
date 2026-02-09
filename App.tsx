@@ -29,6 +29,11 @@ const App: React.FC = () => {
     assignedTo: []
   });
 
+  // State for Progress Update Modal
+  const [taskToUpdate, setTaskToUpdate] = useState<Task | null>(null);
+  const [tempProgress, setTempProgress] = useState<number>(0);
+  const [updateMessage, setUpdateMessage] = useState<string>('');
+
   // Persistent Login Check
   useEffect(() => {
     const savedUser = localStorage.getItem('iitm_event_user');
@@ -59,7 +64,6 @@ const App: React.FC = () => {
         if (catsErr) console.error("Error fetching categories:", catsErr);
         if (tasksErr) console.error("Error fetching tasks:", tasksErr);
 
-        // Merge DB users with Super Admin constant to ensure it's always available
         const allUsers = dbUsers && dbUsers.length > 0 ? dbUsers : USERS;
         const hasSuperAdmin = allUsers.some(u => u.role === 'super-admin');
         if (!hasSuperAdmin) {
@@ -150,29 +154,37 @@ const App: React.FC = () => {
     return Math.round(totalProgress);
   }, [updatedCategories]);
 
-  const handleUpdateTask = async (updatedTask: Task) => {
-    if (!currentUser) return;
-    
-    const newProgress = Math.min(updatedTask.progress + 10, 100);
-    const newStatus = newProgress === 100 ? 'completed' : 'in-progress';
+  // Triggers the modal instead of doing fixed logic
+  const handleUpdateTask = (task: Task) => {
+    setTaskToUpdate(task);
+    setTempProgress(task.progress);
+    setUpdateMessage('');
+  };
+
+  const submitProgressUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskToUpdate || !currentUser) return;
+
+    const newStatus = tempProgress === 100 ? 'completed' : tempProgress === 0 ? 'not-started' : 'in-progress';
     
     const newUpdate = {
       timestamp: new Date().toISOString(),
       user: currentUser.name,
-      message: `Updated progress to ${newProgress}% via quick update.`,
-      progressBefore: updatedTask.progress,
-      progressAfter: newProgress
+      message: updateMessage || `Progress updated manually to ${tempProgress}%.`,
+      progressBefore: taskToUpdate.progress,
+      progressAfter: tempProgress
     };
 
     const finalTask: Task = {
-      ...updatedTask,
-      progress: newProgress,
+      ...taskToUpdate,
+      progress: tempProgress,
       status: newStatus,
-      updates: [newUpdate, ...updatedTask.updates]
+      updates: [newUpdate, ...taskToUpdate.updates]
     };
 
     // Update local state first (Optimistic)
-    setTasks(prev => prev.map(t => t.id === updatedTask.id ? finalTask : t));
+    setTasks(prev => prev.map(t => t.id === taskToUpdate.id ? finalTask : t));
+    setTaskToUpdate(null);
 
     // Sync with backend
     try {
@@ -195,22 +207,24 @@ const App: React.FC = () => {
   const handleAddTask = async (categoryId: string, taskData: Partial<Task>) => {
     if (!currentUser) return;
 
+    const assignedTo = currentUser.role === 'super-admin' 
+      ? (taskData.assignedTo?.length ? taskData.assignedTo : [currentUser.name])
+      : [currentUser.name];
+
     const newTask: Task = {
       id: `task-${Date.now()}`,
       categoryId,
       title: taskData.title || 'Untitled Task',
       description: taskData.description || '',
-      assignedTo: taskData.assignedTo?.length ? taskData.assignedTo : [currentUser.name],
+      assignedTo: assignedTo,
       status: 'not-started',
       progress: 0,
       dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
       updates: []
     };
 
-    // Update local state first
     setTasks(prev => [...prev, newTask]);
 
-    // Sync with backend
     try {
       await supabase.from('tasks').insert({
         id: newTask.id,
@@ -235,16 +249,13 @@ const App: React.FC = () => {
       return;
     }
 
-    // Update local state
     setTasks(prev => prev.filter(t => t.id !== taskId));
 
-    // Sync with backend
     try {
       const { error } = await supabase.from('tasks').delete().eq('id', taskId);
       if (error) throw error;
     } catch (err) {
       console.error("Failed to delete task from Supabase:", err);
-      // Optional: Refresh data to restore state if deletion failed
     }
   };
 
@@ -261,6 +272,7 @@ const App: React.FC = () => {
   };
 
   const toggleGlobalAssignee = (name: string) => {
+    if (currentUser?.role !== 'super-admin') return; 
     setGlobalNewTask(prev => {
       const current = prev.assignedTo || [];
       const next = current.includes(name) 
@@ -300,8 +312,6 @@ const App: React.FC = () => {
     return <Login onLogin={handleLogin} users={users} />;
   }
 
-  // Filter tasks for "My Tasks" view
-  // Super Admin sees ALL tasks for management
   const myVisibleTasks = tasks.filter(t => 
     currentUser.role === 'super-admin' || 
     t.assignedTo.some(name => name.includes(currentUser.name) || name.includes('Team'))
@@ -406,11 +416,10 @@ const App: React.FC = () => {
                             onClick={() => handleUpdateTask(task)}
                             className={`
                               px-6 py-2 rounded-xl font-bold transition-all shadow-sm
-                              ${task.progress === 100 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'}
+                              ${task.progress === 100 ? 'bg-indigo-50 text-indigo-400 border border-indigo-200' : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'}
                             `}
-                            disabled={task.progress === 100}
                           >
-                            {task.progress === 100 ? 'Completed' : 'Update'}
+                            {task.progress === 100 ? 'Review / Edit' : 'Update Progress'}
                           </button>
                           {currentUser.role === 'super-admin' && (
                              <button 
@@ -432,113 +441,187 @@ const App: React.FC = () => {
                </div>
              )}
           </div>
+        </div>
+      )}
 
-          {/* Global Task Creation Modal */}
-          {isGlobalTaskModalOpen && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fadeIn">
-              <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-indigo-100">
-                <div className="p-6 bg-indigo-900 text-white flex justify-between items-center">
-                  <div>
-                    <h2 className="text-xl font-bold">New Task Creation</h2>
-                    <p className="text-xs text-indigo-300 mt-0.5">Creating for: {currentUser.name}</p>
-                  </div>
-                  <button onClick={() => setIsGlobalTaskModalOpen(false)} className="hover:bg-white/10 p-2 rounded-xl transition-colors text-xl">✕</button>
-                </div>
-                
-                <form onSubmit={handleGlobalSubmit} className="p-6 space-y-5">
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Task Title</label>
-                    <input 
-                      autoFocus
-                      required
-                      type="text" 
-                      value={globalNewTask.title}
-                      onChange={e => setGlobalNewTask(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="What needs to be done?"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Project Category</label>
-                    <div className="relative">
-                      <select
-                        required
-                        value={globalNewTask.categoryId}
-                        onChange={e => setGlobalNewTask(prev => ({ ...prev, categoryId: e.target.value }))}
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer"
-                      >
-                        <option value="" disabled>Select category...</option>
-                        {categories.map(cat => (
-                          <option key={cat.id} value={cat.id}>{cat.name}</option>
-                        ))}
-                      </select>
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">▼</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Description (Optional)</label>
-                    <textarea 
-                      value={globalNewTask.description}
-                      onChange={e => setGlobalNewTask(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Add specific details or instructions..."
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none h-24 resize-none transition-all"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Target Due Date</label>
-                      <input 
-                        type="date" 
-                        value={globalNewTask.dueDate}
-                        onChange={e => setGlobalNewTask(prev => ({ ...prev, dueDate: e.target.value }))}
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Assign To Member(s)</label>
-                    <div className="flex flex-wrap gap-2 mt-2 max-h-24 overflow-y-auto p-1 custom-scrollbar">
-                      {users.map(u => (
-                        <button
-                          key={u.id}
-                          type="button"
-                          onClick={() => toggleGlobalAssignee(u.name)}
-                          className={`
-                            px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border
-                            ${globalNewTask.assignedTo?.includes(u.name) 
-                              ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
-                              : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300 hover:text-indigo-600'}
-                          `}
-                        >
-                          {u.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="pt-4 flex space-x-3">
-                    <button 
-                      type="button" 
-                      onClick={() => setIsGlobalTaskModalOpen(false)}
-                      className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all active:scale-95"
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      type="submit"
-                      className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-95 border-b-4 border-indigo-800"
-                    >
-                      Save Task
-                    </button>
-                  </div>
-                </form>
+      {/* Progress Update Modal */}
+      {taskToUpdate && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fadeIn">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-indigo-100">
+            <div className="p-6 bg-indigo-900 text-white flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold">Update Progress</h2>
+                <p className="text-xs text-indigo-300 mt-0.5 truncate max-w-[200px]">{taskToUpdate.title}</p>
               </div>
+              <button onClick={() => setTaskToUpdate(null)} className="hover:bg-white/10 p-2 rounded-xl transition-colors text-xl">✕</button>
             </div>
-          )}
+            
+            <form onSubmit={submitProgressUpdate} className="p-6 space-y-6">
+              <div className="text-center">
+                <div className="text-5xl font-black text-indigo-600 mb-2">{tempProgress}%</div>
+                <div className="flex items-center space-x-4">
+                  <button 
+                    type="button"
+                    onClick={() => setTempProgress(Math.max(0, tempProgress - 5))}
+                    className="w-12 h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-2xl transition-all active:scale-90"
+                  >
+                    -
+                  </button>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="100" 
+                    step="1"
+                    value={tempProgress}
+                    onChange={(e) => setTempProgress(parseInt(e.target.value))}
+                    className="flex-1 accent-indigo-600 h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setTempProgress(Math.min(100, tempProgress + 5))}
+                    className="w-12 h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-2xl transition-all active:scale-90"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Update Message (Optional)</label>
+                <textarea 
+                  value={updateMessage}
+                  onChange={e => setUpdateMessage(e.target.value)}
+                  placeholder="What was accomplished?"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none h-24 resize-none transition-all"
+                />
+              </div>
+
+              <div className="flex space-x-3">
+                <button 
+                  type="button" 
+                  onClick={() => setTaskToUpdate(null)}
+                  className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-95 border-b-4 border-indigo-800"
+                >
+                  Save Progress
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Global Task Creation Modal */}
+      {isGlobalTaskModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fadeIn">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-indigo-100">
+            <div className="p-6 bg-indigo-900 text-white flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold">New Task Creation</h2>
+                <p className="text-xs text-indigo-300 mt-0.5">Creating for: {currentUser.name}</p>
+              </div>
+              <button onClick={() => setIsGlobalTaskModalOpen(false)} className="hover:bg-white/10 p-2 rounded-xl transition-colors text-xl">✕</button>
+            </div>
+            
+            <form onSubmit={handleGlobalSubmit} className="p-6 space-y-5">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Task Title</label>
+                <input 
+                  autoFocus
+                  required
+                  type="text" 
+                  value={globalNewTask.title}
+                  onChange={e => setGlobalNewTask(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="What needs to be done?"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Project Category</label>
+                <div className="relative">
+                  <select
+                    required
+                    value={globalNewTask.categoryId}
+                    onChange={e => setGlobalNewTask(prev => ({ ...prev, categoryId: e.target.value }))}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="" disabled>Select category...</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">▼</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Description (Optional)</label>
+                <textarea 
+                  value={globalNewTask.description}
+                  onChange={e => setGlobalNewTask(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Add specific details or instructions..."
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none h-24 resize-none transition-all"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Target Due Date</label>
+                  <input 
+                    type="date" 
+                    value={globalNewTask.dueDate}
+                    onChange={e => setGlobalNewTask(prev => ({ ...prev, dueDate: e.target.value }))}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {currentUser.role === 'super-admin' && (
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Assign To Member(s)</label>
+                  <div className="flex flex-wrap gap-2 mt-2 max-h-24 overflow-y-auto p-1 custom-scrollbar">
+                    {users.map(u => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => toggleGlobalAssignee(u.name)}
+                        className={`
+                          px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border
+                          ${globalNewTask.assignedTo?.includes(u.name) 
+                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
+                            : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300 hover:text-indigo-600'}
+                        `}
+                      >
+                        {u.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-4 flex space-x-3">
+                <button 
+                  type="button" 
+                  onClick={() => setIsGlobalTaskModalOpen(false)}
+                  className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-95 border-b-4 border-indigo-800"
+                >
+                  Save Task
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
