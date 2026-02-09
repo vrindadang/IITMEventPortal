@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
-import { User } from '../types';
-import { USERS } from '../constants';
+import { User } from '../types.ts';
+import { USERS } from '../constants.ts';
 
 interface LoginProps {
   onLogin: (user: User) => void;

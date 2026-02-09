@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
-import { EVENT_DATE } from '../constants';
-import { User } from '../types';
+import { EVENT_DATE } from '../constants.ts';
+import { User } from '../types.ts';
 
 interface LayoutProps {
   children: React.ReactNode;

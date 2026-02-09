@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo } from 'react';
-import { User, Task, Status } from '../types';
+import { User, Task, Status } from '../types.ts';
 
 interface TeamViewProps {
   users: User[];

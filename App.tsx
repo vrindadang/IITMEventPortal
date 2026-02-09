@@ -1,13 +1,12 @@
-
 import React, { useState, useMemo } from 'react';
-import Layout from './components/Layout';
-import Dashboard from './components/Dashboard';
-import CategoryDetail from './components/CategoryDetail';
-import AISmartInsights from './components/AISmartInsights';
-import Login from './components/Login';
-import TeamView from './components/TeamView';
-import { CATEGORIES, TASKS, USERS } from './constants';
-import { Category, Task, Phase, User } from './types';
+import Layout from './components/Layout.tsx';
+import Dashboard from './components/Dashboard.tsx';
+import CategoryDetail from './components/CategoryDetail.tsx';
+import AISmartInsights from './components/AISmartInsights.tsx';
+import Login from './components/Login.tsx';
+import TeamView from './components/TeamView.tsx';
+import { CATEGORIES, TASKS, USERS } from './constants.ts';
+import { Category, Task, Phase, User } from './types.ts';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);

@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
-import { generateInsights, generateWeeklyReport } from '../services/geminiService';
-import { Category, Task } from '../types';
+import { generateInsights, generateWeeklyReport } from '../services/geminiService.ts';
+import { Category, Task } from '../types.ts';
 
 interface AISmartInsightsProps {
   categories: Category[];

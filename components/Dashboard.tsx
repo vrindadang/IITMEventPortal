@@ -1,7 +1,6 @@
-
 import React, { useState, useMemo } from 'react';
-import { Category, Phase, Status, Task } from '../types';
-import { EVENT_DATE } from '../constants';
+import { Category, Phase, Status, Task } from '../types.ts';
+import { EVENT_DATE } from '../constants.ts';
 
 interface DashboardProps {
   categories: Category[];
