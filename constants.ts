@@ -1,5 +1,4 @@
-
-import { Category, Task, User, Phase } from './types';
+import { Category, Task, User, Phase } from './types.ts';
 
 export const EVENT_DATE = "2026-03-10";
 
