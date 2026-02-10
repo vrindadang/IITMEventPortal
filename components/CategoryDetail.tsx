@@ -1,13 +1,16 @@
+
 import React, { useState } from 'react';
-import { Category, Task, User } from '../types.ts';
+import { Category, Task, User, ScheduleItem } from '../types.ts';
 
 interface CategoryDetailProps {
   category: Category;
   tasks: Task[];
   users: User[];
+  schedule: ScheduleItem[];
   currentUser: User;
   onBack: () => void;
   onUpdateTask: (task: Task) => void;
+  onEditTask: (task: Task) => void;
   onAddTask: (categoryId: string, task: Partial<Task>) => void;
   onDeleteTask: (taskId: string) => void;
 }
@@ -15,10 +18,12 @@ interface CategoryDetailProps {
 const CategoryDetail: React.FC<CategoryDetailProps> = ({ 
   category, 
   tasks, 
-  users, 
+  users,
+  schedule,
   currentUser,
   onBack, 
   onUpdateTask, 
+  onEditTask,
   onAddTask,
   onDeleteTask
 }) => {
@@ -27,7 +32,8 @@ const CategoryDetail: React.FC<CategoryDetailProps> = ({
     title: '',
     description: '',
     dueDate: new Date().toISOString().split('T')[0],
-    assignedTo: []
+    assignedTo: [],
+    scheduleItemId: ''
   });
 
   const getStatusBadge = (status: string) => {
@@ -39,6 +45,12 @@ const CategoryDetail: React.FC<CategoryDetailProps> = ({
     }
   };
 
+  const isAuthorizedForTask = (task: Task) => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'super-admin') return true;
+    return task.assignedTo.includes(currentUser.name);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTask.title) return;
@@ -48,7 +60,8 @@ const CategoryDetail: React.FC<CategoryDetailProps> = ({
       title: '',
       description: '',
       dueDate: new Date().toISOString().split('T')[0],
-      assignedTo: []
+      assignedTo: [],
+      scheduleItemId: ''
     });
   };
 
@@ -130,57 +143,77 @@ const CategoryDetail: React.FC<CategoryDetailProps> = ({
               </button>
             </div>
             <div className="space-y-4">
-              {tasks.length > 0 ? tasks.map(task => (
-                <div key={task.id} className="p-5 bg-white border border-slate-200 rounded-xl hover:border-indigo-300 transition-colors shadow-sm">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="font-bold text-slate-800 text-lg">{task.title}</h3>
-                      <p className="text-sm text-slate-500 mt-1">{task.description}</p>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                       <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${getStatusBadge(task.status)}`}>
-                         {task.status.replace('-', ' ')}
-                       </span>
-                       {currentUser.role === 'super-admin' && (
-                         <button 
-                           onClick={() => onDeleteTask(task.id)}
-                           className="text-[10px] font-bold text-red-400 hover:text-red-600 uppercase tracking-widest bg-red-50 px-2 py-1 rounded transition-colors"
-                         >
-                           Delete
-                         </button>
-                       )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex -space-x-2">
-                        {task.assignedTo.map((name, i) => (
-                          <div key={i} className="w-8 h-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-600" title={name}>
-                            {name.split(' ').map(n => n[0]).join('')}
-                          </div>
-                        ))}
+              {tasks.length > 0 ? tasks.map(task => {
+                const linkedEvent = schedule.find(s => s.id === task.scheduleItemId);
+                const isMine = isAuthorizedForTask(task);
+                return (
+                  <div key={task.id} className={`p-5 bg-white border ${isMine ? 'border-indigo-300' : 'border-slate-200'} rounded-xl hover:border-indigo-400 transition-colors shadow-sm`}>
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h3 className="font-bold text-slate-800 text-lg">{task.title}</h3>
+                          {linkedEvent && (
+                            <span className="text-[9px] font-black bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full border border-purple-100 uppercase tracking-tighter">
+                              Linked: {linkedEvent.event_transit}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-500">{task.description}</p>
                       </div>
-                      <div className="text-xs text-slate-400 font-medium">
-                        Due: {new Date(task.dueDate).toLocaleDateString('en-GB')}
+                      <div className="flex flex-col items-end gap-2">
+                         <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${getStatusBadge(task.status)}`}>
+                           {task.status.replace('-', ' ')}
+                         </span>
+                         {isMine && (
+                           <div className="flex gap-2">
+                             <button 
+                               onClick={() => onEditTask(task)}
+                               className="text-[10px] font-bold text-indigo-400 hover:text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded transition-colors"
+                             >
+                               Edit
+                             </button>
+                             <button 
+                               onClick={() => onDeleteTask(task.id)}
+                               className="text-[10px] font-bold text-red-400 hover:text-red-600 uppercase tracking-widest bg-red-50 px-2 py-1 rounded transition-colors"
+                             >
+                               Delete
+                             </button>
+                           </div>
+                         )}
                       </div>
                     </div>
-                  </div>
+                    
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex -space-x-2">
+                          {task.assignedTo.map((name, i) => (
+                            <div key={i} className="w-8 h-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-600" title={name}>
+                              {name.split(' ').map(n => n[0]).join('')}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-xs text-slate-400 font-medium">
+                          Due: {new Date(task.dueDate).toLocaleDateString('en-GB')}
+                        </div>
+                      </div>
+                    </div>
 
-                  <div className="flex items-center space-x-4">
-                    <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="bg-indigo-500 h-full transition-all duration-1000" style={{ width: `${task.progress}%` }} />
+                    <div className="flex items-center space-x-4">
+                      <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div className="bg-indigo-500 h-full transition-all duration-1000" style={{ width: `${task.progress}%` }} />
+                      </div>
+                      <span className="text-sm font-bold text-slate-700">{task.progress}%</span>
+                      <button 
+                        disabled={!isMine}
+                        onClick={() => onUpdateTask(task)}
+                        className={`text-xs font-bold ${isMine ? 'text-indigo-600 hover:text-indigo-800' : 'text-slate-300 cursor-not-allowed'}`}
+                      >
+                        Update
+                      </button>
                     </div>
-                    <span className="text-sm font-bold text-slate-700">{task.progress}%</span>
-                    <button 
-                      onClick={() => onUpdateTask(task)}
-                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
-                    >
-                      Update
-                    </button>
                   </div>
-                </div>
-              )) : (
+                );
+              }) : (
                 <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-300">
                   <p className="text-slate-500">No tasks found for this category.</p>
                 </div>
@@ -235,6 +268,23 @@ const CategoryDetail: React.FC<CategoryDetailProps> = ({
                   placeholder="e.g. Draft invite list"
                   className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Link to Schedule Event (Optional)</label>
+                <div className="relative">
+                  <select
+                    value={newTask.scheduleItemId}
+                    onChange={e => setNewTask(prev => ({ ...prev, scheduleItemId: e.target.value }))}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="">No Schedule Link</option>
+                    {schedule.map(item => (
+                      <option key={item.id} value={item.id}>{item.time} - {item.event_transit}</option>
+                    ))}
+                  </select>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">🔗</span>
+                </div>
               </div>
 
               <div>

@@ -1,7 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { Category, Task } from "../types.ts";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+// Always use the process.env.API_KEY directly for initialization as per guidelines
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export async function generateInsights(categories: Category[], tasks: Task[]) {
   try {

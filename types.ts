@@ -3,6 +3,8 @@ export type Phase = 'pre-event' | 'during-event' | 'post-event';
 
 export type Status = 'not-started' | 'in-progress' | 'completed' | 'blocked';
 
+export type NavView = 'dashboard' | 'tasks' | 'progress' | 'my-tasks-sub' | 'overall-tasks-list' | 'gallery' | 'approvals' | 'messenger' | 'schedule' | 'team-members';
+
 export interface User {
   id: string;
   name: string;
@@ -30,6 +32,8 @@ export interface Task {
   progress: number;
   dueDate: string;
   updates: TaskUpdate[];
+  scheduleItemId?: string;
+  attachments?: string[];
 }
 
 export interface Category {
@@ -41,6 +45,24 @@ export interface Category {
   status: Status;
   dueDate: string;
   priority: 'high' | 'medium' | 'low';
+}
+
+export interface ScheduleItem {
+  id: string;
+  s_no: number;
+  time: string;
+  event_transit: string;
+  duration: string;
+  description?: string;
+}
+
+export interface GalleryItem {
+  id: string;
+  task_id: string;
+  schedule_item_id: string;
+  uploaded_by: string;
+  photo_data: string;
+  created_at: string;
 }
 
 export interface EventState {

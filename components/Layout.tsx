@@ -1,11 +1,12 @@
+
 import React, { useState } from 'react';
 import { EVENT_DATE } from '../constants.ts';
-import { User } from '../types.ts';
+import { User, NavView } from '../types.ts';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeView: 'dashboard' | 'my-tasks' | 'team';
-  onNavigate: (view: 'dashboard' | 'my-tasks' | 'team') => void;
+  activeView: NavView;
+  onNavigate: (view: NavView) => void;
   currentUser: User;
   onLogout: () => void;
 }
@@ -71,10 +72,17 @@ const NotificationDropdown = () => {
 const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate, currentUser, onLogout }) => {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
-  const navItems = [
+  const navItems: { id: NavView; label: string; icon: string; isSub?: boolean }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'my-tasks', label: 'My Tasks', icon: '✅' },
-    { id: 'team', label: 'Team', icon: '👥' },
+    { id: 'tasks', label: 'Tasks', icon: '✅' },
+    { id: 'progress', label: 'Progress', icon: '📈', isSub: true },
+    { id: 'my-tasks-sub', label: 'My Tasks', icon: '👤', isSub: true },
+    { id: 'overall-tasks-list', label: 'Overall', icon: '📋', isSub: true },
+    { id: 'gallery', label: 'Gallery', icon: '🖼️' },
+    { id: 'approvals', label: 'Approval Requests', icon: '📥' },
+    { id: 'messenger', label: 'Messenger', icon: '💬' },
+    { id: 'schedule', label: 'Schedule', icon: '📅' },
+    { id: 'team-members', label: 'Team Members', icon: '👥' },
   ];
 
   const daysToGo = Math.ceil((new Date(EVENT_DATE).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
@@ -110,21 +118,23 @@ const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate, curre
           </div>
         </div>
 
-        <nav className="mt-6 px-4 space-y-2 flex-1">
+        <nav className="mt-6 px-4 space-y-1 flex-1 overflow-y-auto custom-scrollbar">
           {navItems.map((item) => (
             <button
               key={item.id}
               onClick={() => {
-                onNavigate(item.id as any);
+                onNavigate(item.id);
                 setSidebarOpen(false);
               }}
               className={`
-                w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors
-                ${activeView === item.id ? 'bg-indigo-700 text-white shadow-lg' : 'text-indigo-200 hover:bg-indigo-800'}
+                w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all
+                ${activeView === item.id ? 'bg-indigo-700 text-white shadow-lg translate-x-1' : 'text-indigo-200 hover:bg-indigo-800/50'}
+                ${item.isSub ? 'ml-6 w-[calc(100%-1.5rem)] py-1.5' : ''}
               `}
             >
-              <span className="text-xl">{item.icon}</span>
-              <span className="font-medium">{item.label}</span>
+              {item.isSub && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500/50 flex-shrink-0" />}
+              <span className="text-lg">{item.icon}</span>
+              <span className={`${item.isSub ? 'text-sm font-medium' : 'font-semibold'}`}>{item.label}</span>
             </button>
           ))}
         </nav>
