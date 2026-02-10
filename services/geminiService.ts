@@ -1,11 +1,16 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { Category, Task } from "../types.ts";
 
-// Always use the process.env.API_KEY directly for initialization as per guidelines
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export async function generateInsights(categories: Category[], tasks: Task[]) {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.error("Gemini API Key is missing. Please ensure it is set in the environment.");
+    return "AI insights are currently unavailable because the API key is not configured.";
+  }
+
   try {
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `
@@ -26,12 +31,18 @@ export async function generateInsights(categories: Category[], tasks: Task[]) {
     return response.text;
   } catch (error) {
     console.error("Error generating insights:", error);
-    return "Failed to generate AI insights. Please check your API configuration.";
+    return "Failed to generate AI insights. The service might be temporarily unavailable.";
   }
 }
 
 export async function generateWeeklyReport(categories: Category[]) {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    return "Weekly report generation requires a valid API key.";
+  }
+
   try {
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `
