@@ -112,8 +112,8 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
     // Generate Table
     autoTable(doc, {
       startY: 20 + (splitHeading.length * 7),
-      head: [['S.No.', 'Time', 'Event- / Transit', 'Duration']],
-      body: schedule.map(item => [item.s_no, item.time, item.event_transit, item.duration]),
+      head: [['S.No.', 'Time', 'Duration', 'Event / Transit']],
+      body: schedule.map(item => [item.s_no, item.time, item.duration, item.event_transit]),
       headStyles: { 
         fillColor: [79, 70, 229], // Indigo-600
         textColor: [255, 255, 255],
@@ -131,7 +131,7 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
       columnStyles: {
         0: { cellWidth: 15 },
         1: { cellWidth: 30 },
-        3: { cellWidth: 30 }
+        2: { cellWidth: 30 }
       },
       theme: 'striped',
       margin: { top: 20, left: 14, right: 14 }
@@ -185,8 +185,8 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
               <tr className="bg-slate-50 border-b-2 border-slate-200">
                 <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-r border-slate-100 w-24">S.No.</th>
                 <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-r border-slate-100 w-48">Time</th>
-                <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-r border-slate-100">Event- / Transit</th>
                 <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-r border-slate-100 w-40">Duration</th>
+                <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-r border-slate-100">Event / Transit</th>
                 {isSuperAdmin && <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest w-24">Action</th>}
               </tr>
             </thead>
@@ -195,8 +195,8 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
                 <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
                   <td className="px-6 py-5 font-bold text-slate-400 border-r border-slate-50">{item.s_no}</td>
                   <td className="px-6 py-5 font-bold text-slate-800 border-r border-slate-50">{item.time}</td>
-                  <td className="px-6 py-5 text-slate-700 border-r border-slate-50 font-medium">{item.event_transit}</td>
                   <td className="px-6 py-5 text-slate-500 font-bold border-r border-slate-50">{item.duration}</td>
+                  <td className="px-6 py-5 text-slate-700 border-r border-slate-50 font-medium">{item.event_transit}</td>
                   {isSuperAdmin && (
                     <td className="px-6 py-5">
                       <div className="flex items-center space-x-3">
@@ -266,18 +266,6 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
               </div>
 
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Event- / Transit</label>
-                <input 
-                  required
-                  type="text" 
-                  placeholder="Session name or transit details"
-                  value={newItem.event_transit}
-                  onChange={e => setNewItem(prev => ({ ...prev, event_transit: e.target.value }))}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
-              </div>
-
-              <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Duration</label>
                 <input 
                   required
@@ -285,6 +273,18 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
                   placeholder="e.g. 45 mins"
                   value={newItem.duration}
                   onChange={e => setNewItem(prev => ({ ...prev, duration: e.target.value }))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Event / Transit</label>
+                <input 
+                  required
+                  type="text" 
+                  placeholder="Session name or transit details"
+                  value={newItem.event_transit}
+                  onChange={e => setNewItem(prev => ({ ...prev, event_transit: e.target.value }))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
               </div>
@@ -344,18 +344,6 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
               </div>
 
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Event- / Transit</label>
-                <input 
-                  required
-                  type="text" 
-                  placeholder="Session name or transit details"
-                  value={editingItem.event_transit || ''}
-                  onChange={e => setEditingItem(prev => ({ ...prev, event_transit: e.target.value }))}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
-              </div>
-
-              <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Duration</label>
                 <input 
                   required
@@ -363,6 +351,18 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
                   placeholder="e.g. 45 mins"
                   value={editingItem.duration || ''}
                   onChange={e => setEditingItem(prev => ({ ...prev, duration: e.target.value }))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Event / Transit</label>
+                <input 
+                  required
+                  type="text" 
+                  placeholder="Session name or transit details"
+                  value={editingItem.event_transit || ''}
+                  onChange={e => setEditingItem(prev => ({ ...prev, event_transit: e.target.value }))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
               </div>
