@@ -11,12 +11,14 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [newItem, setNewItem] = useState<Partial<ScheduleItem>>({
     s_no: 1,
     time: '',
     event_transit: '',
     duration: ''
   });
+  const [editingItem, setEditingItem] = useState<Partial<ScheduleItem>>({});
 
   const isSuperAdmin = currentUser.role === 'super-admin';
 
@@ -49,15 +51,44 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
       }])
       .select();
 
-    if (!error) {
+    if (!error && data) {
       setSchedule(prev => [...prev, data[0]].sort((a, b) => a.s_no - b.s_no));
       setIsModalOpen(false);
-      setNewItem({ s_no: schedule.length + 2, time: '', event_transit: '', duration: '' });
+      setNewItem({ s_no: (schedule.length > 0 ? Math.max(...schedule.map(s => s.s_no)) : 0) + 1, time: '', event_transit: '', duration: '' });
     }
+  };
+
+  const handleUpdateRow = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSuperAdmin || !editingItem.id) return;
+
+    const { data, error } = await supabase
+      .from('schedule')
+      .update({
+        s_no: editingItem.s_no,
+        time: editingItem.time,
+        event_transit: editingItem.event_transit,
+        duration: editingItem.duration
+      })
+      .eq('id', editingItem.id)
+      .select();
+
+    if (!error && data) {
+      setSchedule(prev => prev.map(item => item.id === editingItem.id ? data[0] : item).sort((a, b) => a.s_no - b.s_no));
+      setIsEditModalOpen(false);
+      setEditingItem({});
+    }
+  };
+
+  const handleEditClick = (item: ScheduleItem) => {
+    setEditingItem(item);
+    setIsEditModalOpen(true);
   };
 
   const handleDelete = async (id: string) => {
     if (!isSuperAdmin) return;
+    if (!window.confirm("Are you sure you want to delete this schedule row?")) return;
+    
     const { error } = await supabase.from('schedule').delete().eq('id', id);
     if (!error) {
       setSchedule(prev => prev.filter(item => item.id !== id));
@@ -111,13 +142,22 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
                   <td className="px-6 py-5 text-slate-500 font-bold border-r border-slate-50">{item.duration}</td>
                   {isSuperAdmin && (
                     <td className="px-6 py-5">
-                      <button 
-                        onClick={() => handleDelete(item.id)}
-                        className="text-red-400 hover:text-red-600 transition-colors"
-                        title="Delete Row"
-                      >
-                        <span className="text-xl">🗑️</span>
-                      </button>
+                      <div className="flex items-center space-x-3">
+                        <button 
+                          onClick={() => handleEditClick(item)}
+                          className="text-indigo-400 hover:text-indigo-600 transition-colors"
+                          title="Edit Row"
+                        >
+                          <span className="text-xl">✏️</span>
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(item.id)}
+                          className="text-red-400 hover:text-red-600 transition-colors"
+                          title="Delete Row"
+                        >
+                          <span className="text-xl">🗑️</span>
+                        </button>
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -134,6 +174,7 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
         </div>
       </div>
 
+      {/* Add Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-indigo-100">
@@ -204,6 +245,84 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
                   className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-95 border-b-4 border-indigo-800"
                 >
                   Save Row
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-indigo-100">
+            <div className="p-6 bg-indigo-900 text-white flex justify-between items-center">
+              <h2 className="text-xl font-bold">Edit Schedule Row</h2>
+              <button onClick={() => { setIsEditModalOpen(false); setEditingItem({}); }} className="hover:bg-white/10 p-2 rounded-xl transition-colors">✕</button>
+            </div>
+            
+            <form onSubmit={handleUpdateRow} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">S.No.</label>
+                  <input 
+                    required
+                    type="number" 
+                    value={editingItem.s_no || 0}
+                    onChange={e => setEditingItem(prev => ({ ...prev, s_no: parseInt(e.target.value) }))}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Time</label>
+                  <input 
+                    required
+                    type="text" 
+                    placeholder="e.g. 10:30 AM"
+                    value={editingItem.time || ''}
+                    onChange={e => setEditingItem(prev => ({ ...prev, time: e.target.value }))}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Event- / Transit</label>
+                <input 
+                  required
+                  type="text" 
+                  placeholder="Session name or transit details"
+                  value={editingItem.event_transit || ''}
+                  onChange={e => setEditingItem(prev => ({ ...prev, event_transit: e.target.value }))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Duration</label>
+                <input 
+                  required
+                  type="text" 
+                  placeholder="e.g. 45 mins"
+                  value={editingItem.duration || ''}
+                  onChange={e => setEditingItem(prev => ({ ...prev, duration: e.target.value }))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+
+              <div className="pt-4 flex space-x-3">
+                <button 
+                  type="button" 
+                  onClick={() => { setIsEditModalOpen(false); setEditingItem({}); }}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-95 border-b-4 border-indigo-800"
+                >
+                  Update Row
                 </button>
               </div>
             </form>
