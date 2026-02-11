@@ -1,9 +1,12 @@
+
 import React, { useState, useMemo } from 'react';
 import { User, Task, Status } from '../types.ts';
 
 interface TeamViewProps {
   users: User[];
   tasks: Task[];
+  currentUser: User;
+  onDeleteUser?: (userId: string) => void;
 }
 
 interface UserStats {
@@ -15,12 +18,14 @@ interface UserStats {
   lastActive: string | null;
 }
 
-const TeamView: React.FC<TeamViewProps> = ({ users, tasks }) => {
+const TeamView: React.FC<TeamViewProps> = ({ users, tasks, currentUser, onDeleteUser }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
   const [roleFilter, setRoleFilter] = useState('All');
   const [viewMode, setViewMode] = useState<'list' | 'cards'>('list');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+  const isSuperAdmin = currentUser.role === 'super-admin';
 
   // Departments list for filter
   const departments = useMemo(() => ['All', ...new Set(users.map(u => u.department))], [users]);
@@ -76,8 +81,7 @@ const TeamView: React.FC<TeamViewProps> = ({ users, tasks }) => {
 
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
-      const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          user.email.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesDept = deptFilter === 'All' || user.department === deptFilter;
       const matchesRole = roleFilter === 'All' || 
                          (roleFilter === 'Admin' && user.role === 'admin') || 
@@ -139,7 +143,7 @@ const TeamView: React.FC<TeamViewProps> = ({ users, tasks }) => {
           <div className="relative flex-1">
             <input 
               type="text" 
-              placeholder="Search by name or email..."
+              placeholder="Search by name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
@@ -210,7 +214,6 @@ const TeamView: React.FC<TeamViewProps> = ({ users, tasks }) => {
                           </div>
                           <div>
                             <p className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">{user.name}</p>
-                            <p className="text-xs text-slate-400">{user.email}</p>
                           </div>
                         </div>
                       </td>
@@ -219,7 +222,6 @@ const TeamView: React.FC<TeamViewProps> = ({ users, tasks }) => {
                           <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${user.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
                             {user.role}
                           </span>
-                          {/* Special check for Ashwani to keep it clean as requested */}
                           {user.id !== '8' && (
                             <span className="text-[10px] font-medium text-slate-400 italic">{user.department}</span>
                           )}
@@ -249,12 +251,23 @@ const TeamView: React.FC<TeamViewProps> = ({ users, tasks }) => {
                         <p className="text-xs text-slate-500 font-medium">{formatRelativeDate(stat.lastActive)}</p>
                       </td>
                       <td className="px-6 py-4">
-                        <button 
-                          onClick={() => setSelectedUser(user)}
-                          className="px-3 py-1.5 bg-slate-50 hover:bg-indigo-600 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-600 transition-all border border-slate-200"
-                        >
-                          Details
-                        </button>
+                        <div className="flex items-center space-x-2">
+                          <button 
+                            onClick={() => setSelectedUser(user)}
+                            className="px-3 py-1.5 bg-slate-50 hover:bg-indigo-600 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-600 transition-all border border-slate-200"
+                          >
+                            Details
+                          </button>
+                          {isSuperAdmin && user.id !== currentUser.id && (
+                            <button 
+                              onClick={() => onDeleteUser?.(user.id)}
+                              className="px-3 py-1.5 bg-red-50 hover:bg-red-600 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest text-red-600 transition-all border border-red-200"
+                              title="Remove Member"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -268,7 +281,16 @@ const TeamView: React.FC<TeamViewProps> = ({ users, tasks }) => {
           {filteredUsers.map(user => {
             const stat = userStatsMap[user.id];
             return (
-              <div key={user.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-500 transition-all group">
+              <div key={user.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-500 transition-all group relative">
+                {isSuperAdmin && user.id !== currentUser.id && (
+                  <button 
+                    onClick={() => onDeleteUser?.(user.id)}
+                    className="absolute top-4 right-4 p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                    title="Remove Member"
+                  >
+                    🗑️
+                  </button>
+                )}
                 <div className="flex items-center space-x-4 mb-6">
                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-xl transition-all group-hover:scale-110
                     ${user.id === '8' ? 'bg-indigo-600' : 'bg-slate-50 text-indigo-600 border border-indigo-100'}
@@ -326,7 +348,6 @@ const TeamView: React.FC<TeamViewProps> = ({ users, tasks }) => {
                 <div>
                   <h2 className="text-3xl font-black mb-1">{selectedUser.name}</h2>
                   <p className="text-indigo-200 uppercase text-xs font-bold tracking-widest">{selectedUser.role} • {selectedUser.department}</p>
-                  <p className="text-indigo-300 text-sm mt-2">{selectedUser.email}</p>
                 </div>
               </div>
               <button onClick={() => setSelectedUser(null)} className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors">✕</button>

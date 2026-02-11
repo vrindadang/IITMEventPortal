@@ -51,6 +51,16 @@ const App: React.FC = () => {
     scheduleItemId: ''
   });
 
+  // State for Invite Member Modal
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [inviteForm, setInviteForm] = useState<Partial<User>>({
+    name: '',
+    email: '',
+    role: 'team-member',
+    department: '',
+    password: 'password123'
+  });
+
   // State for Progress Update Modal
   const [taskToUpdate, setTaskToUpdate] = useState<Task | null>(null);
   const [tempProgress, setTempProgress] = useState<number>(0);
@@ -129,7 +139,6 @@ const App: React.FC = () => {
 
         if (dbTasks && dbTasks.length > 0) {
           const mappedTasks: Task[] = dbTasks.map(t => {
-            // Dynamically merge photos from gallery associated with this task
             const galleryPhotos = dbGallery 
               ? dbGallery.filter(g => g.task_id === t.id).map(g => g.photo_data) 
               : [];
@@ -145,7 +154,6 @@ const App: React.FC = () => {
               dueDate: t.due_date,
               updates: t.updates || [],
               scheduleItemId: t.schedule_item_id,
-              // Combine existing file attachments with gallery photo data
               attachments: Array.from(new Set([...(t.attachments || []), ...galleryPhotos]))
             };
           });
@@ -209,16 +217,12 @@ const App: React.FC = () => {
 
   const currentVisibleTasks = useMemo(() => {
     if (!currentUser) return [];
-    
-    // In the "My Tasks" sub-tab, we filter to ONLY see personal assignments
     if (activeView === 'my-tasks-sub') {
       if (currentUser.role === 'super-admin') {
         return tasks;
       }
       return tasks.filter(t => t.assignedTo.includes(currentUser.name));
     }
-    
-    // In "Tasks" and "Overall Tasks", show everything
     return tasks;
   }, [tasks, activeView, currentUser]);
 
@@ -239,23 +243,27 @@ const App: React.FC = () => {
     const newUpdate = {
       timestamp: new Date().toISOString(),
       user: currentUser.name,
-      message: updateMessage || `Progress updated manually to ${tempProgress}%.`,
+      message: updateMessage.trim() || `Progress updated manually to ${tempProgress}%.`,
       progressBefore: taskToUpdate.progress,
       progressAfter: tempProgress
     };
+
+    const updatedTaskUpdates = [newUpdate, ...(taskToUpdate.updates || [])];
 
     const finalTask: Task = {
       ...taskToUpdate,
       progress: tempProgress,
       status: newStatus,
-      updates: [newUpdate, ...taskToUpdate.updates]
+      updates: updatedTaskUpdates
     };
 
+    // Update local state immediately
     setTasks(prev => prev.map(t => t.id === taskToUpdate.id ? finalTask : t));
     setTaskToUpdate(null);
 
+    // Persist to backend
     try {
-      await supabase.from('tasks').upsert({
+      const { error } = await supabase.from('tasks').upsert({
         id: finalTask.id,
         category_id: finalTask.categoryId,
         title: finalTask.title,
@@ -268,6 +276,8 @@ const App: React.FC = () => {
         schedule_item_id: finalTask.scheduleItemId || null,
         attachments: finalTask.attachments
       });
+      
+      if (error) throw error;
     } catch (err) {
       console.error("Failed to persist task update to Supabase:", err);
     }
@@ -312,6 +322,62 @@ const App: React.FC = () => {
       });
     } catch (err) {
       console.error("Failed to add task to Supabase:", err);
+    }
+  };
+
+  const handleInviteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteForm.name || !inviteForm.email || !inviteForm.department) return;
+
+    const newUser: User = {
+      id: `user-${Date.now()}`,
+      name: inviteForm.name,
+      email: inviteForm.email,
+      role: (inviteForm.role as any) || 'team-member',
+      department: inviteForm.department,
+      password: inviteForm.password || 'password123'
+    };
+
+    setUsers(prev => [...prev, newUser]);
+    
+    try {
+      const { error } = await supabase.from('users').insert({
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        department: newUser.department,
+        password: newUser.password
+      });
+      if (error) throw error;
+      
+      setIsInviteModalOpen(false);
+      setInviteForm({
+        name: '',
+        email: '',
+        role: 'team-member',
+        department: '',
+        password: 'password123'
+      });
+    } catch (err) {
+      console.error("Failed to invite member:", err);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!currentUser || currentUser.role !== 'super-admin') return;
+    
+    if (!window.confirm("Are you sure you want to remove this team member? All their login credentials will be revoked.")) {
+      return;
+    }
+
+    setUsers(prev => prev.filter(u => u.id !== userId));
+
+    try {
+      const { error } = await supabase.from('users').delete().eq('id', userId);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Failed to delete user from Supabase:", err);
     }
   };
 
@@ -581,13 +647,21 @@ const App: React.FC = () => {
                 <p className="text-slate-500">Analytics and contribution tracking across all departments.</p>
               </div>
               {currentUser.role === 'super-admin' && (
-                <button className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all border-b-4 border-indigo-800">
+                <button 
+                  onClick={() => setIsInviteModalOpen(true)}
+                  className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all border-b-4 border-indigo-800 active:translate-y-0.5 active:border-b-0"
+                >
                   + Invite Member
                 </button>
               )}
            </div>
            
-           <TeamView users={users} tasks={tasks} />
+           <TeamView 
+             users={users} 
+             tasks={tasks} 
+             currentUser={currentUser} 
+             onDeleteUser={handleDeleteUser} 
+           />
         </div>
       )}
 
@@ -661,6 +735,90 @@ const App: React.FC = () => {
                   className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-95 border-b-4 border-indigo-800"
                 >
                   Save Progress
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Invite Member Modal */}
+      {isInviteModalOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fadeIn">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-indigo-100">
+            <div className="p-6 bg-indigo-900 text-white flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold">Invite New Member</h2>
+                <p className="text-xs text-indigo-300 mt-0.5">Expanding the team for IIT-M Talk.</p>
+              </div>
+              <button onClick={() => setIsInviteModalOpen(false)} className="hover:bg-white/10 p-2 rounded-xl transition-colors text-xl">✕</button>
+            </div>
+            
+            <form onSubmit={handleInviteSubmit} className="p-6 space-y-5">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Full Name</label>
+                <input 
+                  autoFocus
+                  required
+                  type="text" 
+                  value={inviteForm.name}
+                  onChange={e => setInviteForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g. Dr. John Doe"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Email Address</label>
+                <input 
+                  required
+                  type="email" 
+                  value={inviteForm.email}
+                  onChange={e => setInviteForm(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="e.g. john@iitm.ac.in"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Department</label>
+                  <input 
+                    required
+                    type="text" 
+                    value={inviteForm.department}
+                    onChange={e => setInviteForm(prev => ({ ...prev, department: e.target.value }))}
+                    placeholder="e.g. Logistics"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Role</label>
+                  <select
+                    value={inviteForm.role}
+                    onChange={e => setInviteForm(prev => ({ ...prev, role: e.target.value as any }))}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="team-member">Team Member</option>
+                    <option value="admin">Admin</option>
+                    <option value="super-admin">Super Admin</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-4 flex space-x-3">
+                <button 
+                  type="button" 
+                  onClick={() => setIsInviteModalOpen(false)}
+                  className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-95 border-b-4 border-indigo-800"
+                >
+                  Send Invitation
                 </button>
               </div>
             </form>
