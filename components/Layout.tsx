@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { EVENT_DATE } from '../constants.ts';
 import { User, NavView } from '../types.ts';
+import { supabase } from '../services/supabaseClient.ts';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,13 +12,77 @@ interface LayoutProps {
   onLogout: () => void;
 }
 
-const NotificationDropdown = () => {
+const NotificationDropdown = ({ isMobile = false }: { isMobile?: boolean }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const notifications = [
-    { id: 1, title: "Task Overdue", message: "Campus Publicity poster design is 2 days overdue", type: "alert", time: "1 hour ago" },
-    { id: 2, title: "Milestone Achieved", message: "Pre-Event phase reached 66% completion", type: "success", time: "3 hours ago" },
-    { id: 3, title: "New Comment", message: "Dr. Anup Naha commented on your task", type: "info", time: "5 hours ago" }
-  ];
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch notifications from Supabase
+  const fetchNotifications = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setNotifications(data || []);
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+      // Fallback to empty if table doesn't exist yet or other error
+      setNotifications([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    
+    // Optional: Set up real-time subscription for new notifications
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications' },
+        () => fetchNotifications()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const clearNotification = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (err) {
+      console.error("Error clearing notification:", err);
+    }
+  };
+
+  const clearAll = async () => {
+    try {
+      // Deleting all rows (requires appropriate RLS or service role if RLS is enabled)
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+      
+      if (error) throw error;
+      setNotifications([]);
+    } catch (err) {
+      console.error("Error clearing all notifications:", err);
+    }
+  };
 
   return (
     <div className="relative">
@@ -27,7 +92,7 @@ const NotificationDropdown = () => {
       >
         <span className="text-xl">🔔</span>
         {notifications.length > 0 && (
-          <span className="absolute top-1 right-1 bg-red-500 text-[8px] font-bold text-white rounded-full w-4 h-4 flex items-center justify-center border border-indigo-900">
+          <span className="absolute top-1 right-1 bg-red-500 text-[8px] font-bold text-white rounded-full w-4 h-4 flex items-center justify-center border border-indigo-900 animate-pulse">
             {notifications.length}
           </span>
         )}
@@ -36,30 +101,62 @@ const NotificationDropdown = () => {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
-          <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-slideUp">
-            <div className="p-4 border-b border-slate-100 bg-slate-50">
-              <h3 className="font-bold text-slate-800 text-sm">Notifications</h3>
+          <div className={`
+            absolute mt-3 w-80 bg-white rounded-3xl shadow-2xl border border-slate-200 z-[100] overflow-hidden animate-slideUp
+            ${isMobile ? 'right-0' : 'left-0 md:left-2'}
+          `}>
+            <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+              <h3 className="font-bold text-slate-800 text-xs uppercase tracking-widest">Notifications</h3>
+              {notifications.length > 0 && (
+                <button 
+                  onClick={clearAll}
+                  className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase"
+                >
+                  Clear All
+                </button>
+              )}
             </div>
-            <div className="max-h-96 overflow-y-auto">
-              {notifications.map(notif => (
-                <div key={notif.id} className="p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer">
-                  <div className="flex items-start gap-3">
-                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                      notif.type === 'alert' ? 'bg-red-500' : 
-                      notif.type === 'success' ? 'bg-green-500' : 'bg-blue-500'
-                    }`}></div>
-                    <div className="flex-1">
-                      <p className="font-bold text-xs text-slate-900">{notif.title}</p>
-                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">{notif.message}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-2 tracking-wider">{notif.time}</p>
+            
+            <div className="max-h-[32rem] overflow-y-auto custom-scrollbar">
+              {isLoading && notifications.length === 0 ? (
+                <div className="p-10 text-center">
+                   <div className="w-6 h-6 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-2"></div>
+                   <p className="text-[10px] text-slate-400 font-bold uppercase">Syncing...</p>
+                </div>
+              ) : notifications.length > 0 ? (
+                notifications.map(notif => (
+                  <div key={notif.id} className="relative p-5 border-b border-slate-50 hover:bg-slate-50 transition-colors group">
+                    <button 
+                      onClick={() => clearNotification(notif.id)}
+                      className="absolute top-4 right-4 text-slate-300 hover:text-red-500 transition-colors text-xs opacity-0 group-hover:opacity-100"
+                    >
+                      ✕
+                    </button>
+                    <div className="flex items-start gap-4">
+                      <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 shadow-sm ${
+                        notif.type === 'alert' ? 'bg-red-500 shadow-red-200' : 
+                        notif.type === 'success' ? 'bg-green-500 shadow-green-200' : 'bg-blue-500 shadow-blue-200'
+                      }`}></div>
+                      <div className="flex-1 pr-4">
+                        <p className="font-black text-[11px] text-slate-900 uppercase tracking-tight mb-0.5">{notif.title}</p>
+                        <p className="text-xs text-slate-500 leading-relaxed font-medium">{notif.message}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-2 tracking-widest">{notif.time}</p>
+                      </div>
                     </div>
                   </div>
+                ))
+              ) : (
+                <div className="py-12 px-6 text-center">
+                  <div className="text-4xl mb-3 opacity-20">📭</div>
+                  <p className="text-sm font-bold text-slate-400">All caught up!</p>
+                  <p className="text-[10px] text-slate-300 uppercase mt-1">No new alerts to show</p>
                 </div>
-              ))}
+              )}
             </div>
-            <div className="p-3 text-center bg-slate-50">
-              <button className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">
-                View All Notifications
+            
+            <div className="p-4 text-center bg-slate-50 border-t border-slate-100">
+              <button className="text-[10px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-widest transition-colors">
+                Notification History
               </button>
             </div>
           </div>
@@ -93,7 +190,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate, curre
       <header className="md:hidden bg-indigo-900 text-white p-4 flex justify-between items-center sticky top-0 z-50 shadow-md">
         <h1 className="font-bold text-lg">IIT-M Event</h1>
         <div className="flex items-center space-x-2">
-          <NotificationDropdown />
+          <NotificationDropdown isMobile={true} />
           <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-2 bg-indigo-800 rounded">
             {isSidebarOpen ? '✕' : '☰'}
           </button>
@@ -109,7 +206,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate, curre
           <div className="flex justify-between items-start mb-1">
             <h1 className="text-xl font-bold">IIT Madras Talk</h1>
             <div className="hidden md:block">
-              <NotificationDropdown />
+              <NotificationDropdown isMobile={false} />
             </div>
           </div>
           <p className="text-indigo-300 text-sm">10/03/2026</p>

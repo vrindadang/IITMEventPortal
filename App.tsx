@@ -51,6 +51,11 @@ const App: React.FC = () => {
     scheduleItemId: ''
   });
 
+  // State for inline Category creation
+  const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [isCategoryLoading, setIsCategoryLoading] = useState(false);
+
   // State for Invite Member Modal
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState<Partial<User>>({
@@ -112,6 +117,7 @@ const App: React.FC = () => {
         if (schedErr) console.error("Error fetching schedule:", schedErr);
         if (galleryErr) console.error("Error fetching gallery:", galleryErr);
 
+        // Handle Users
         const allUsers = dbUsers && dbUsers.length > 0 ? dbUsers : USERS;
         const hasSuperAdmin = allUsers.some(u => u.role === 'super-admin');
         if (!hasSuperAdmin) {
@@ -121,7 +127,8 @@ const App: React.FC = () => {
           setUsers(allUsers);
         }
         
-        if (dbCategories && dbCategories.length > 0) {
+        // Handle Categories
+        if (dbCategories !== null) {
           const mappedCats: Category[] = dbCategories.map(c => ({
             id: c.id,
             name: c.name,
@@ -132,12 +139,13 @@ const App: React.FC = () => {
             dueDate: c.due_date,
             priority: c.priority
           }));
-          setCategories(mappedCats);
+          setCategories(mappedCats.length > 0 ? mappedCats : CATEGORIES);
         } else {
           setCategories(CATEGORIES);
         }
 
-        if (dbTasks && dbTasks.length > 0) {
+        // Handle Tasks
+        if (dbTasks !== null) {
           const mappedTasks: Task[] = dbTasks.map(t => {
             const galleryPhotos = dbGallery 
               ? dbGallery.filter(g => g.task_id === t.id).map(g => g.photo_data) 
@@ -148,7 +156,7 @@ const App: React.FC = () => {
               categoryId: t.category_id,
               title: t.title,
               description: t.description,
-              assignedTo: t.assigned_to,
+              assignedTo: t.assigned_to || [],
               status: t.status as Status,
               progress: t.progress,
               dueDate: t.due_date,
@@ -157,7 +165,8 @@ const App: React.FC = () => {
               attachments: Array.from(new Set([...(t.attachments || []), ...galleryPhotos]))
             };
           });
-          setTasks(mappedTasks);
+          // Explicitly handle empty array vs error fallback
+          setTasks(mappedTasks.length > 0 ? mappedTasks : (dbTasks.length === 0 ? [] : TASKS));
         } else {
           setTasks(TASKS);
         }
@@ -181,7 +190,7 @@ const App: React.FC = () => {
   const updatedCategories = useMemo(() => {
     return categories.map(cat => {
       const catTasks = tasks.filter(t => t.categoryId === cat.id);
-      if (catTasks.length === 0) return cat;
+      if (catTasks.length === 0) return { ...cat, progress: 0, status: 'not-started' };
       const progress = Math.round(catTasks.reduce((acc, t) => acc + t.progress, 0) / catTasks.length);
       const isBlocked = catTasks.some(t => t.status === 'blocked');
       const isCompleted = catTasks.every(t => t.status === 'completed');
@@ -322,6 +331,47 @@ const App: React.FC = () => {
       });
     } catch (err) {
       console.error("Failed to add task to Supabase:", err);
+    }
+  };
+
+  // Function to add a category on the fly
+  const handleAddNewCategory = async () => {
+    if (!newCategoryName.trim() || !currentUser) return;
+    
+    setIsCategoryLoading(true);
+    const newCat: Partial<Category> = {
+      id: `cat-${Date.now()}`,
+      name: newCategoryName.trim(),
+      phase: 'pre-event',
+      responsiblePersons: [currentUser.name],
+      progress: 0,
+      status: 'not-started',
+      dueDate: '2026-03-10',
+      priority: 'medium'
+    };
+
+    try {
+      const { error } = await supabase.from('categories').insert({
+        id: newCat.id,
+        name: newCat.name,
+        phase: newCat.phase,
+        responsible_persons: newCat.responsiblePersons,
+        progress: newCat.progress,
+        status: newCat.status,
+        due_date: newCat.dueDate,
+        priority: newCat.priority
+      });
+
+      if (error) throw error;
+
+      setCategories(prev => [...prev, newCat as Category]);
+      setGlobalNewTask(prev => ({ ...prev, categoryId: newCat.id }));
+      setIsAddingNewCategory(false);
+      setNewCategoryName('');
+    } catch (err) {
+      console.error("Failed to create category:", err);
+    } finally {
+      setIsCategoryLoading(false);
     }
   };
 
@@ -852,31 +902,62 @@ const App: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Project Category</label>
-                  <div className="relative">
-                    <select
-                      required
-                      value={globalNewTask.categoryId}
-                      onChange={e => setGlobalNewTask(prev => ({ ...prev, categoryId: e.target.value }))}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer"
+              <div className="grid grid-cols-2 gap-4 overflow-visible">
+                <div className="flex flex-col">
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Project Category</label>
+                    <button 
+                      type="button"
+                      onClick={() => setIsAddingNewCategory(!isAddingNewCategory)}
+                      className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase"
                     >
-                      <option value="" disabled>Select category...</option>
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">▼</span>
+                      {isAddingNewCategory ? 'Cancel' : '+ Add New'}
+                    </button>
                   </div>
+                  
+                  {isAddingNewCategory ? (
+                    <div className="flex flex-col space-y-2 animate-fadeIn">
+                      <input 
+                        autoFocus
+                        type="text"
+                        value={newCategoryName}
+                        onChange={e => setNewCategoryName(e.target.value)}
+                        placeholder="New category..."
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all shadow-inner"
+                      />
+                      <button 
+                        type="button"
+                        disabled={isCategoryLoading || !newCategoryName.trim()}
+                        onClick={handleAddNewCategory}
+                        className={`w-full py-2.5 rounded-xl font-bold text-white transition-all shadow-md text-xs border-b-2 ${isCategoryLoading ? 'bg-indigo-300 border-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700 border-indigo-800 active:translate-y-0.5 active:border-b-0'}`}
+                      >
+                        {isCategoryLoading ? 'Processing...' : 'Add & Select'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <select
+                        required
+                        value={globalNewTask.categoryId}
+                        onChange={e => setGlobalNewTask(prev => ({ ...prev, categoryId: e.target.value }))}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer transition-all pr-10"
+                      >
+                        <option value="" disabled>Select category...</option>
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">▼</span>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Link to Schedule Event (Optional)</label>
+                <div className="flex flex-col">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Link to Event (Optional)</label>
                   <div className="relative">
                     <select
                       value={globalNewTask.scheduleItemId}
                       onChange={e => setGlobalNewTask(prev => ({ ...prev, scheduleItemId: e.target.value }))}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer pr-10"
                     >
                       <option value="">No Schedule Link</option>
                       {schedule.map(item => (
@@ -913,7 +994,7 @@ const App: React.FC = () => {
               {currentUser.role === 'super-admin' && (
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Assign To Member(s)</label>
-                  <div className="flex flex-wrap gap-2 mt-2 max-h-24 overflow-y-auto p-1 custom-scrollbar">
+                  <div className="flex flex-wrap gap-2 mt-2 max-h-24 overflow-y-auto p-1 custom-scrollbar border border-slate-100 rounded-xl">
                     {users.map(u => (
                       <button
                         key={u.id}
@@ -943,7 +1024,8 @@ const App: React.FC = () => {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-95 border-b-4 border-indigo-800"
+                  disabled={isAddingNewCategory}
+                  className={`flex-1 py-4 font-bold rounded-2xl transition-all shadow-lg active:scale-95 border-b-4 ${isAddingNewCategory ? 'bg-slate-300 border-slate-400 cursor-not-allowed opacity-50' : 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-800'}`}
                 >
                   Save Task
                 </button>
