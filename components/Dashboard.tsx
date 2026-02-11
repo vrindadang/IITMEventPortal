@@ -35,7 +35,6 @@ const Dashboard: React.FC<DashboardProps> = ({ categories, overallProgress, onSe
   const activeIndex = useMemo(() => {
     if (schedule.length === 0) return 0;
     const idx = schedule.findIndex(item => (scheduleItemProgress[item.id] || 0) < 100);
-    // If all are 100%, set last as active
     return idx === -1 ? schedule.length - 1 : idx;
   }, [schedule, scheduleItemProgress]);
 
@@ -49,8 +48,6 @@ const Dashboard: React.FC<DashboardProps> = ({ categories, overallProgress, onSe
       
       if (data) {
         setSchedule(data);
-        
-        // Focus on the first incomplete item (active node) on load
         const currentActiveIdx = data.findIndex(item => {
           const itemTasks = tasks.filter(t => t.scheduleItemId === item.id);
           const progress = itemTasks.length > 0 
@@ -76,15 +73,13 @@ const Dashboard: React.FC<DashboardProps> = ({ categories, overallProgress, onSe
     tasks.filter(task => task.scheduleItemId === selectedItemId),
   [tasks, selectedItemId]);
 
-  // Color constants - Satisfying the new requirement for a purely Green/Light Green timeline
-  const GREEN = '#22c55e'; // For all tasks completed
-  const LIGHT_GREEN = '#86efac'; // For some tasks pending
-  const DARK_ORANGE = '#ff6b52'; // Preserved for other UI elements
+  const GREEN = '#22c55e'; 
+  const LIGHT_GREEN = '#86efac'; 
   
-  // The progress line ends exactly at the active index's center
   const timelineProgressWidth = useMemo(() => {
     if (schedule.length <= 1) return 0;
     const totalSegments = schedule.length - 1;
+    // Progress line goes from the center of node 0 to center of active node
     return (activeIndex / totalSegments) * 100;
   }, [schedule, activeIndex]);
 
@@ -116,50 +111,46 @@ const Dashboard: React.FC<DashboardProps> = ({ categories, overallProgress, onSe
         <div className="space-y-12">
           {/* Timeline Visualizer */}
           <div className="relative bg-white rounded-[3rem] border border-slate-200 shadow-[0_20px_50px_rgba(0,0,0,0.05)] overflow-hidden">
-            <div className="overflow-x-auto py-28 px-24 no-scrollbar">
-              <div className="relative flex items-center min-w-max">
+            <div className="overflow-x-auto py-32 px-24 no-scrollbar">
+              <div className="relative flex items-center min-w-max h-48">
                 
-                {/* 1. Background Track Line (Now Green to show the full timeline of tasks) */}
+                {/* 1. Background Track Line - Full Green */}
                 <div 
-                  className="absolute left-0 right-0 h-1.5 rounded-full" 
+                  className="absolute left-16 right-16 h-1.5 rounded-full z-0" 
                   style={{ 
                     top: '50%', 
                     transform: 'translateY(-50%)', 
-                    backgroundColor: GREEN // Set to Green as requested
+                    backgroundColor: GREEN 
                   }} 
                 />
                 
                 {/* 2. Progress Overlay Line */}
                 <div 
-                  className="absolute left-0 h-1.5 transition-all duration-1000 ease-in-out z-10 rounded-full" 
+                  className="absolute left-16 h-1.5 transition-all duration-1000 ease-in-out z-10 rounded-full" 
                   style={{ 
                     top: '50%', 
                     transform: 'translateY(-50%)',
-                    width: `${timelineProgressWidth}%`,
-                    backgroundColor: GREEN, // Overlay matches the track
+                    width: `calc(${timelineProgressWidth}% - 32px)`,
+                    backgroundColor: GREEN,
                   }}
                 />
                 
                 {schedule.map((item, index) => {
                   const isSelected = selectedItemId === item.id;
                   
-                  // Task Status Logic for Node Colors
                   const itemTasks = tasks.filter(t => t.scheduleItemId === item.id);
                   const hasTasks = itemTasks.length > 0;
                   const allTasksCompleted = hasTasks && itemTasks.every(t => t.progress === 100);
                   const someTasksPending = hasTasks && itemTasks.some(t => t.progress < 100);
                   
-                  // Node Color determination: Green if done, Light Green if pending. No grey.
                   let nodeColor = LIGHT_GREEN;
                   if (allTasksCompleted) {
                     nodeColor = GREEN;
                   } else if (someTasksPending || index === activeIndex) {
                     nodeColor = LIGHT_GREEN;
                   } else if (index < activeIndex) {
-                    // Items before the active one are considered completed/green
                     nodeColor = GREEN; 
                   } else {
-                    // Future items with no tasks are considered pending/light green
                     nodeColor = LIGHT_GREEN;
                   }
                   
@@ -167,13 +158,13 @@ const Dashboard: React.FC<DashboardProps> = ({ categories, overallProgress, onSe
                     <div 
                       key={item.id} 
                       onClick={() => setSelectedItemId(item.id)}
-                      className={`flex flex-col items-center relative z-20 mx-16 cursor-pointer group transition-all duration-500`}
+                      className="flex flex-col items-center relative z-20 mx-16 cursor-pointer group flex-shrink-0"
                     >
-                      {/* Time Bubble */}
-                      <div className="absolute -top-16">
+                      {/* Time Bubble Pill - Ensuring single line */}
+                      <div className="absolute -top-20 whitespace-nowrap min-w-max">
                         <span className={`
-                          text-[10px] font-black px-4 py-1.5 rounded-full border transition-all
-                          ${isSelected ? 'bg-slate-900 border-slate-900 text-white shadow-lg scale-110' : 'bg-white border-slate-200 text-slate-400'}
+                          text-[10px] font-black px-6 py-2 rounded-full border transition-all shadow-sm block
+                          ${isSelected ? 'bg-[#1e293b] border-[#1e293b] text-white scale-110 shadow-lg' : 'bg-white border-slate-200 text-slate-400'}
                         `}>
                           {item.time}
                         </span>
@@ -182,50 +173,50 @@ const Dashboard: React.FC<DashboardProps> = ({ categories, overallProgress, onSe
                       {/* Circle Node - Pulse if Selected */}
                       <div 
                         className={`
-                          rounded-full flex items-center justify-center transition-all duration-500 border-4
+                          rounded-full flex items-center justify-center transition-all duration-500 border-4 relative
                           ${isSelected ? 'w-16 h-16 shadow-2xl animate-pulse scale-110' : 'w-14 h-14'}
                         `}
                         style={{ 
                           backgroundColor: nodeColor,
-                          borderColor: isSelected ? 'rgba(255,255,255,0.8)' : nodeColor
+                          borderColor: isSelected ? 'rgba(255,255,255,1)' : 'rgba(255,255,255,0.4)'
                         }}
                       >
-                        {allTasksCompleted && (
-                          <span className="text-white text-lg font-black leading-none">✓</span>
+                        {allTasksCompleted ? (
+                          <span className="text-white text-xl font-bold leading-none">✓</span>
+                        ) : (
+                          <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-white' : 'bg-white/60'}`} />
                         )}
-                        {isSelected && !allTasksCompleted && (
-                          <div className="w-2.5 h-2.5 bg-white rounded-full" />
-                        )}
-                        {!allTasksCompleted && !isSelected && (
-                           <div className="w-2 h-2 rounded-full bg-white/40" />
+
+                        {isSelected && (
+                          <div className="absolute inset-[-10px] bg-indigo-500/5 rounded-full -z-10 blur-xl animate-pulse" />
                         )}
                       </div>
 
-                      {/* Labels */}
-                      <div className="absolute top-20 flex flex-col items-center w-48 text-center">
+                      {/* Labels - Stacking like the screenshot */}
+                      <div className="absolute top-20 flex flex-col items-center w-64 text-center pointer-events-none">
                         <h4 className={`
-                          text-[11px] leading-tight uppercase tracking-tight transition-all duration-300 mb-1
-                          ${allTasksCompleted ? 'text-green-600 font-black' : (isSelected ? 'text-indigo-600 font-black' : 'text-slate-400 font-bold')}
+                          text-[11px] leading-tight uppercase font-black tracking-tighter mb-1.5 transition-colors
+                          ${allTasksCompleted ? 'text-green-600' : (isSelected ? 'text-indigo-600' : 'text-slate-400')}
                         `}>
                           {item.event_transit}
                         </h4>
                         
-                        <div className="flex items-center">
+                        <div className="flex flex-col items-center">
                           {allTasksCompleted ? (
-                            <span className="text-[9px] font-black text-green-600 uppercase tracking-widest bg-green-50 px-2 py-0.5 rounded border border-green-100">
-                              VERIFIED
-                            </span>
-                          ) : someTasksPending ? (
-                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">
-                              IN PROGRESS
-                            </span>
+                            <div className="bg-green-50 px-3 py-1 rounded border border-green-100">
+                                <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">
+                                  VERIFIED
+                                </span>
+                            </div>
                           ) : isSelected ? (
-                            <span className="text-[9px] font-black text-white uppercase tracking-widest bg-indigo-600 px-2.5 py-1 rounded shadow-sm">
-                              ACTIVE
-                            </span>
+                            <div className="bg-indigo-50 px-3 py-1 rounded border border-indigo-100">
+                                <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">
+                                  IN PROGRESS
+                                </span>
+                            </div>
                           ) : (
-                            <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">
-                              {item.duration || 'WAIT'}
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                              {item.duration || '10 MINS'}
                             </span>
                           )}
                         </div>
