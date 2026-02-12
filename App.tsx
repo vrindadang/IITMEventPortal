@@ -40,6 +40,9 @@ const App: React.FC = () => {
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
+  // State for task search
+  const [taskSearchQuery, setTaskSearchQuery] = useState('');
+
   // State for Global Task Creation Modal
   const [isGlobalTaskModalOpen, setIsGlobalTaskModalOpen] = useState(false);
   const [globalNewTask, setGlobalNewTask] = useState<Partial<Task>>({
@@ -226,14 +229,28 @@ const App: React.FC = () => {
 
   const currentVisibleTasks = useMemo(() => {
     if (!currentUser) return [];
+    
+    let filtered = tasks;
+    
+    // Initial scope filter based on view
     if (activeView === 'my-tasks-sub') {
-      if (currentUser.role === 'super-admin') {
-        return tasks;
+      if (currentUser.role !== 'super-admin') {
+        filtered = tasks.filter(t => t.assignedTo.includes(currentUser.name));
       }
-      return tasks.filter(t => t.assignedTo.includes(currentUser.name));
     }
-    return tasks;
-  }, [tasks, activeView, currentUser]);
+
+    // Apply search filter if query exists
+    if (taskSearchQuery.trim()) {
+      const query = taskSearchQuery.toLowerCase();
+      filtered = filtered.filter(t => 
+        t.title.toLowerCase().includes(query) || 
+        t.description.toLowerCase().includes(query) ||
+        t.assignedTo.some(name => name.toLowerCase().includes(query))
+      );
+    }
+    
+    return filtered;
+  }, [tasks, activeView, currentUser, taskSearchQuery]);
 
   const handleUpdateTask = (task: Task) => {
     if (!isAuthorizedForTask(task)) return;
@@ -582,7 +599,7 @@ const App: React.FC = () => {
 
       {(activeView === 'tasks' || activeView === 'my-tasks-sub' || activeView === 'overall-tasks-list') && (
         <div className="space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
             <div>
               <h2 className="text-3xl font-bold text-slate-800">
                 {activeView === 'my-tasks-sub' ? 'My Tasks' : (activeView === 'overall-tasks-list' ? 'Overall Tasks' : (currentUser.role === 'super-admin' ? 'Task Management' : 'Event Tasks'))}
@@ -605,6 +622,28 @@ const App: React.FC = () => {
                 <span className={`w-2 h-2 ${currentUser.role === 'super-admin' ? 'bg-red-500' : 'bg-indigo-500'} rounded-full animate-pulse`}></span>
                 <span className="text-sm font-bold text-indigo-900">{currentUser.name}</span>
               </div>
+            </div>
+          </div>
+
+          {/* Search Bar for Tasks */}
+          <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm mb-6">
+            <div className="relative">
+              <input 
+                type="text" 
+                placeholder="Search tasks by title, description, or member..."
+                value={taskSearchQuery}
+                onChange={(e) => setTaskSearchQuery(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm font-medium"
+              />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">🔍</span>
+              {taskSearchQuery && (
+                <button 
+                  onClick={() => setTaskSearchQuery('')}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold"
+                >
+                  ✕
+                </button>
+              )}
             </div>
           </div>
           
@@ -680,9 +719,15 @@ const App: React.FC = () => {
                })
              ) : (
                <div className="bg-white py-24 text-center rounded-3xl border border-slate-200 border-dashed">
-                 <div className="text-6xl mb-6">🎯</div>
-                 <h3 className="text-xl font-bold text-slate-800">No tasks found</h3>
-                 <p className="text-slate-500 mt-2">Click "Create Task" above to start tracking contributions.</p>
+                 <div className="text-6xl mb-6">{taskSearchQuery ? '🔍' : '🎯'}</div>
+                 <h3 className="text-xl font-bold text-slate-800">
+                    {taskSearchQuery ? 'No matches found' : 'No tasks found'}
+                 </h3>
+                 <p className="text-slate-500 mt-2">
+                    {taskSearchQuery 
+                      ? 'Try adjusting your search query or clear it to see all tasks.' 
+                      : 'Click "Create Task" above to start tracking contributions.'}
+                 </p>
                </div>
              )}
           </div>

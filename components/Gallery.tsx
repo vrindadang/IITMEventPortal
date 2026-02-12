@@ -15,6 +15,7 @@ const Gallery: React.FC<GalleryProps> = ({ tasks, schedule, currentUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   
   // Upload State
   const [selectedTaskId, setSelectedTaskId] = useState('');
@@ -205,7 +206,7 @@ const Gallery: React.FC<GalleryProps> = ({ tasks, schedule, currentUser }) => {
                           src={item.photo_data} 
                           alt="Thumbnail" 
                           className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform"
-                          onClick={() => window.open(item.photo_data, '_blank')}
+                          onClick={() => setPreviewImage(item.photo_data)}
                         />
                       </div>
                     </td>
@@ -388,6 +389,29 @@ const Gallery: React.FC<GalleryProps> = ({ tasks, schedule, currentUser }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-12 bg-slate-950/90 backdrop-blur-xl animate-fadeIn cursor-zoom-out"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="relative max-w-5xl w-full h-full flex items-center justify-center">
+            <button 
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-0 right-0 m-4 md:m-8 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all z-[210] border border-white/10 backdrop-blur-md"
+            >
+              <span className="text-2xl block leading-none">✕</span>
+            </button>
+            <img 
+              src={previewImage} 
+              alt="Full Preview" 
+              className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl animate-slideUp cursor-default"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         </div>
       )}

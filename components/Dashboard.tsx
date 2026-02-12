@@ -15,6 +15,7 @@ const Dashboard: React.FC<DashboardProps> = ({ categories, overallProgress, onSe
   const [loading, setLoading] = useState(true);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedHistoryTask, setSelectedHistoryTask] = useState<Task | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Calculate real progress per schedule item based on linked tasks
   const scheduleItemProgress = useMemo(() => {
@@ -299,7 +300,11 @@ const Dashboard: React.FC<DashboardProps> = ({ categories, overallProgress, onSe
                               {task.attachments && task.attachments.length > 0 ? (
                                 task.attachments.map((at, i) => (
                                   at.startsWith('data:image') ? (
-                                    <div key={i} className="w-11 h-11 rounded-xl overflow-hidden border-2 border-slate-100 shadow-md">
+                                    <div 
+                                      key={i} 
+                                      onClick={() => setPreviewImage(at)}
+                                      className="w-11 h-11 rounded-xl overflow-hidden border-2 border-slate-100 shadow-md cursor-pointer hover:scale-110 hover:border-indigo-400 transition-all"
+                                    >
                                       <img src={at} alt="Evidence" className="w-full h-full object-cover" />
                                     </div>
                                   ) : null
@@ -418,6 +423,29 @@ const Dashboard: React.FC<DashboardProps> = ({ categories, overallProgress, onSe
                 Close Audit View
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-12 bg-slate-950/90 backdrop-blur-xl animate-fadeIn cursor-zoom-out"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="relative max-w-5xl w-full h-full flex items-center justify-center">
+            <button 
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-0 right-0 m-4 md:m-8 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all z-[210] border border-white/10 backdrop-blur-md"
+            >
+              <span className="text-2xl block leading-none">✕</span>
+            </button>
+            <img 
+              src={previewImage} 
+              alt="Full Preview" 
+              className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl animate-slideUp cursor-default"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         </div>
       )}
