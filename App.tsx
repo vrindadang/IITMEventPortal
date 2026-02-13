@@ -9,6 +9,7 @@ import TeamView from './components/TeamView.tsx';
 import Schedule from './components/Schedule.tsx';
 import Gallery from './components/Gallery.tsx';
 import OverallSummary from './components/OverallSummary.tsx';
+import GuestList from './components/GuestList.tsx';
 import { CATEGORIES, TASKS, USERS } from './constants.ts';
 import { Category, Task, Phase, User, Status, NavView, ScheduleItem } from './types.ts';
 import { supabase } from './services/supabaseClient.ts';
@@ -761,6 +762,7 @@ const App: React.FC = () => {
       )}
 
       {activeView === 'gallery' && <Gallery tasks={tasks} schedule={schedule} currentUser={currentUser} />}
+      {activeView === 'confirmed-guest-list' && <GuestList currentUser={currentUser} />}
       {activeView === 'approvals' && <PlaceholderView title="Approval Workflow" icon="📥" />}
       {activeView === 'messenger' && <PlaceholderView title="Team Messenger" icon="💬" />}
       {activeView === 'schedule' && <Schedule currentUser={currentUser} />}

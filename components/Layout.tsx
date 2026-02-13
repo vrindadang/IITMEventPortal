@@ -176,6 +176,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate, curre
     { id: 'my-tasks-sub', label: 'My Tasks', icon: '👤', isSub: true },
     { id: 'overall-tasks-list', label: 'Overall', icon: '📋', isSub: true },
     { id: 'gallery', label: 'Gallery', icon: '🖼️' },
+    { id: 'confirmed-guest-list', label: 'Guest List', icon: '🎫' },
     { id: 'approvals', label: 'Approval Requests', icon: '📥' },
     { id: 'messenger', label: 'Messenger', icon: '💬' },
     { id: 'schedule', label: 'Schedule', icon: '📅' },
