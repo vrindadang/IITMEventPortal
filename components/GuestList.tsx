@@ -18,8 +18,13 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
   const [newAttendee, setNewAttendee] = useState<Partial<Attendee>>({
     name: '',
     designation: '',
-    organization: ''
+    organization: '',
+    seating_category: '',
+    def_touchpoint: ''
   });
+  const [isAddingSeatingCategory, setIsAddingSeatingCategory] = useState(false);
+  const [customSeatingCategory, setCustomSeatingCategory] = useState('');
+  
   const [editingAttendee, setEditingAttendee] = useState<Attendee | null>(null);
   const [editNameValue, setEditNameValue] = useState('');
 
@@ -50,6 +55,10 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
     e.preventDefault();
     if (!newAttendee.name) return;
 
+    const seatingVal = isAddingSeatingCategory 
+      ? (customSeatingCategory.trim() || 'General') 
+      : (newAttendee.seating_category || 'General');
+
     setSubmitting(true);
     try {
       const { data, error } = await supabase
@@ -58,6 +67,8 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
           name: newAttendee.name,
           designation: newAttendee.designation || 'N/A',
           organization: newAttendee.organization || 'N/A',
+          seating_category: seatingVal,
+          def_touchpoint: newAttendee.def_touchpoint || 'N/A',
           invited_by: currentUser.name
         }])
         .select();
@@ -67,7 +78,7 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
       if (data) {
         setAttendees(prev => [data[0], ...prev]);
         setIsModalOpen(false);
-        setNewAttendee({ name: '', designation: '', organization: '' });
+        resetForm();
       }
     } catch (err) {
       console.error("Error adding attendee:", err);
@@ -122,6 +133,18 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
     setIsEditNameModalOpen(true);
   };
 
+  const resetForm = () => {
+    setNewAttendee({ 
+      name: '', 
+      designation: '', 
+      organization: '',
+      seating_category: '',
+      def_touchpoint: ''
+    });
+    setIsAddingSeatingCategory(false);
+    setCustomSeatingCategory('');
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px]">
@@ -156,6 +179,8 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Guest Name</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Designation</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Organization</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Seating</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Touchpoint</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Invited By</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>
               </tr>
@@ -174,6 +199,12 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
                     <span className="text-xs font-medium text-slate-500">{attendee.organization}</span>
                   </td>
                   <td className="px-6 py-4">
+                    <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg uppercase tracking-wider">{attendee.seating_category}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-[10px] font-bold text-slate-500 italic uppercase">{attendee.def_touchpoint}</span>
+                  </td>
+                  <td className="px-6 py-4">
                     <div className="flex items-center space-x-2">
                       <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-[8px] font-bold text-indigo-600">
                         {attendee.invited_by.split(' ').map(n => n[0]).join('')}
@@ -181,7 +212,7 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
                       <span className="text-xs font-bold text-indigo-600">{attendee.invited_by}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center space-x-3">
                       <button 
                         onClick={() => openEditNameModal(attendee)}
@@ -204,7 +235,7 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-24 text-center">
+                  <td colSpan={8} className="px-6 py-24 text-center">
                     <div className="text-6xl mb-4 opacity-10">🎫</div>
                     <p className="text-slate-400 font-medium italic">The guest list is currently empty.</p>
                   </td>
@@ -221,10 +252,10 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-indigo-100">
             <div className="p-6 bg-indigo-900 text-white flex justify-between items-center">
               <h2 className="text-xl font-bold">Register Confirmed Attendee</h2>
-              <button onClick={() => setIsModalOpen(false)} className="hover:bg-white/10 p-2 rounded-xl transition-colors">✕</button>
+              <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="hover:bg-white/10 p-2 rounded-xl transition-colors">✕</button>
             </div>
             
-            <form onSubmit={handleAddAttendee} className="p-6 space-y-6">
+            <form onSubmit={handleAddAttendee} className="p-6 space-y-5">
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Full Name</label>
                 <input 
@@ -260,10 +291,63 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col">
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Seating Category</label>
+                    <button 
+                      type="button"
+                      onClick={() => setIsAddingSeatingCategory(!isAddingSeatingCategory)}
+                      className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase"
+                    >
+                      {isAddingSeatingCategory ? 'Cancel' : '+ Add New'}
+                    </button>
+                  </div>
+                  
+                  {isAddingSeatingCategory ? (
+                    <input 
+                      autoFocus
+                      type="text"
+                      value={customSeatingCategory}
+                      onChange={e => setCustomSeatingCategory(e.target.value)}
+                      placeholder="Custom category..."
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all shadow-inner"
+                    />
+                  ) : (
+                    <div className="relative">
+                      <select
+                        value={newAttendee.seating_category}
+                        onChange={e => setNewAttendee(prev => ({ ...prev, seating_category: e.target.value }))}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer pr-10"
+                      >
+                        <option value="">Select Category...</option>
+                        <option value="VIP">VIP</option>
+                        <option value="VVIP">VVIP</option>
+                        <option value="Faculty">Faculty</option>
+                        <option value="Student">Student</option>
+                        <option value="Press">Press</option>
+                        <option value="General">General</option>
+                      </select>
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">▼</span>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">DEF Touchpoint</label>
+                  <input 
+                    type="text" 
+                    value={newAttendee.def_touchpoint}
+                    onChange={e => setNewAttendee(prev => ({ ...prev, def_touchpoint: e.target.value }))}
+                    placeholder="e.g. South Block"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
               <div className="pt-4 flex space-x-3">
                 <button 
                   type="button" 
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => { setIsModalOpen(false); resetForm(); }}
                   className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all"
                 >
                   Cancel
@@ -287,7 +371,7 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-indigo-100">
             <div className="p-6 bg-indigo-900 text-white flex justify-between items-center">
               <h2 className="text-xl font-bold">Edit Attendee Name</h2>
-              <button onClick={() => setIsEditNameModalOpen(false)} className="hover:bg-white/10 p-2 rounded-xl transition-colors">✕</button>
+              <button onClick={() => { setIsEditNameModalOpen(false); setEditingAttendee(null); }} className="hover:bg-white/10 p-2 rounded-xl transition-colors">✕</button>
             </div>
             
             <form onSubmit={handleUpdateName} className="p-6 space-y-6">
@@ -306,7 +390,7 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
               <div className="pt-4 flex space-x-3">
                 <button 
                   type="button" 
-                  onClick={() => setIsEditNameModalOpen(false)}
+                  onClick={() => { setIsEditNameModalOpen(false); setEditingAttendee(null); }}
                   className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all"
                 >
                   Cancel

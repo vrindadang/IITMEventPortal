@@ -70,6 +70,8 @@ export interface Attendee {
   name: string;
   designation: string;
   organization: string;
+  seating_category: string;
+  def_touchpoint: string;
   invited_by: string;
   created_at: string;
 }
