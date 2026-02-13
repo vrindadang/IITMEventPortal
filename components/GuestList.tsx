@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { User, Attendee } from '../types.ts';
 import { supabase } from '../services/supabaseClient.ts';
 
@@ -20,7 +20,7 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
     designation: '',
     organization: '',
     seating_category: '',
-    def_touchpoint: ''
+    count: '1'
   });
   const [isAddingSeatingCategory, setIsAddingSeatingCategory] = useState(false);
   const [customSeatingCategory, setCustomSeatingCategory] = useState('');
@@ -29,6 +29,7 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
   const [editNameValue, setEditNameValue] = useState('');
 
   const isSuperAdmin = currentUser.role === 'super-admin';
+  const CAPACITY_LIMIT = 850;
 
   useEffect(() => {
     fetchAttendees();
@@ -51,6 +52,14 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
     }
   };
 
+  const totalGuestCount = useMemo(() => {
+    return attendees.reduce((acc, curr) => {
+      const val = parseInt(curr.count);
+      // Defensive check: if database has 'N/A' or non-numeric string, count as 1
+      return acc + (isNaN(val) ? 1 : val);
+    }, 0);
+  }, [attendees]);
+
   const handleAddAttendee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAttendee.name) return;
@@ -68,7 +77,7 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
           designation: newAttendee.designation || 'N/A',
           organization: newAttendee.organization || 'N/A',
           seating_category: seatingVal,
-          def_touchpoint: newAttendee.def_touchpoint || 'N/A',
+          count: newAttendee.count || '1',
           invited_by: currentUser.name
         }])
         .select();
@@ -139,7 +148,7 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
       designation: '', 
       organization: '',
       seating_category: '',
-      def_touchpoint: ''
+      count: '1'
     });
     setIsAddingSeatingCategory(false);
     setCustomSeatingCategory('');
@@ -157,10 +166,26 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
   return (
     <div className="space-y-8 animate-fadeIn pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold text-slate-800">Confirmed Attendees</h2>
-          <p className="text-slate-500">Official list of guests and delegates for the talk.</p>
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div>
+            <h2 className="text-3xl font-bold text-slate-800">Confirmed Attendees</h2>
+            <p className="text-slate-500">Official list of guests and delegates for the talk.</p>
+          </div>
+          
+          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-5 py-3 flex flex-col items-center justify-center">
+            <div className="flex items-center space-x-2">
+              <span className="text-indigo-600 text-xs font-black uppercase tracking-widest">Total Count</span>
+              <span className="text-xl font-black text-indigo-900">{totalGuestCount} <span className="text-indigo-300">/ {CAPACITY_LIMIT}</span></span>
+            </div>
+            <div className="w-32 h-1.5 bg-indigo-200 rounded-full mt-1.5 overflow-hidden">
+              <div 
+                className="h-full bg-indigo-600 transition-all duration-1000 ease-out" 
+                style={{ width: `${Math.min(100, (totalGuestCount / CAPACITY_LIMIT) * 100)}%` }} 
+              />
+            </div>
+          </div>
         </div>
+        
         <button 
           onClick={() => setIsModalOpen(true)}
           className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold shadow-xl hover:bg-indigo-700 transition-all active:scale-95 flex items-center space-x-2 border-b-4 border-indigo-800"
@@ -180,7 +205,7 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Designation</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Organization</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Seating</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Touchpoint</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Count</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Invited By</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>
               </tr>
@@ -201,8 +226,8 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
                   <td className="px-6 py-4">
                     <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg uppercase tracking-wider">{attendee.seating_category}</span>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="text-[10px] font-bold text-slate-500 italic uppercase">{attendee.def_touchpoint}</span>
+                  <td className="px-6 py-4 text-center">
+                    <span className="text-sm font-black text-slate-700 italic">{attendee.count}</span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-2">
@@ -333,12 +358,13 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
                   )}
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">DEF Touchpoint</label>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Count (Incl. Self)</label>
                   <input 
-                    type="text" 
-                    value={newAttendee.def_touchpoint}
-                    onChange={e => setNewAttendee(prev => ({ ...prev, def_touchpoint: e.target.value }))}
-                    placeholder="e.g. South Block"
+                    type="number" 
+                    min="1"
+                    value={newAttendee.count}
+                    onChange={e => setNewAttendee(prev => ({ ...prev, count: e.target.value }))}
+                    placeholder="e.g. 2"
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
@@ -368,7 +394,7 @@ const GuestList: React.FC<GuestListProps> = ({ currentUser }) => {
       {/* Edit Name Modal */}
       {isEditNameModalOpen && editingAttendee && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fadeIn">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-indigo-100">
+          <div className="bg-white w-full max-md:max-w-[calc(100%-2rem)] max-w-md rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-indigo-100">
             <div className="p-6 bg-indigo-900 text-white flex justify-between items-center">
               <h2 className="text-xl font-bold">Edit Attendee Name</h2>
               <button onClick={() => { setIsEditNameModalOpen(false); setEditingAttendee(null); }} className="hover:bg-white/10 p-2 rounded-xl transition-colors">✕</button>

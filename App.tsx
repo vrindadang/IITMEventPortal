@@ -13,6 +13,8 @@ import GuestList from './components/GuestList.tsx';
 import { CATEGORIES, TASKS, USERS } from './constants.ts';
 import { Category, Task, Phase, User, Status, NavView, ScheduleItem } from './types.ts';
 import { supabase } from './services/supabaseClient.ts';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const PlaceholderView = ({ title, icon }: { title: string, icon: string }) => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fadeIn text-center">
@@ -253,6 +255,52 @@ const App: React.FC = () => {
     return filtered;
   }, [tasks, activeView, currentUser, taskSearchQuery]);
 
+  const generateTasksPDF = () => {
+    const doc = new jsPDF();
+    const title = activeView === 'my-tasks-sub' ? 'My Tasks Report' : 
+                  activeView === 'overall-tasks-list' ? 'Overall Tasks List' : 'Event Tasks Report';
+    
+    doc.setFontSize(16);
+    doc.setTextColor(30, 41, 59);
+    doc.text(`${title} - IIT Madras Talk`, 14, 15);
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Generated on: ${new Date().toLocaleString('en-GB')}`, 14, 22);
+
+    const tableData = currentVisibleTasks.map((task, index) => [
+      index + 1,
+      task.title,
+      updatedCategories.find(c => c.id === task.categoryId)?.name || 'N/A',
+      task.assignedTo.join(', '),
+      task.status.replace('-', ' ').toUpperCase(),
+      `${task.progress}%`,
+      new Date(task.dueDate).toLocaleDateString('en-GB')
+    ]);
+
+    autoTable(doc, {
+      startY: 30,
+      head: [['S.No.', 'Task Title', 'Category', 'Assigned To', 'Status', 'Progress', 'Due Date']],
+      body: tableData,
+      headStyles: { 
+        fillColor: [79, 70, 229],
+        textColor: [255, 255, 255],
+        fontSize: 10,
+        fontStyle: 'bold'
+      },
+      bodyStyles: { 
+        fontSize: 9,
+        textColor: [51, 65, 85]
+      },
+      alternateRowStyles: { 
+        fillColor: [248, 250, 252]
+      },
+      theme: 'striped',
+      margin: { top: 30 }
+    });
+
+    doc.save(`IITM_Tasks_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   const handleUpdateTask = (task: Task) => {
     if (!isAuthorizedForTask(task)) return;
     setTaskToUpdate(task);
@@ -261,6 +309,7 @@ const App: React.FC = () => {
   };
 
   const submitProgressUpdate = async (e: React.FormEvent) => {
+    // ... logic remains same
     e.preventDefault();
     if (!taskToUpdate || !currentUser) return;
     if (!isAuthorizedForTask(taskToUpdate)) return;
@@ -352,7 +401,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Function to add a category on the fly
   const handleAddNewCategory = async () => {
     if (!newCategoryName.trim() || !currentUser) return;
     
@@ -613,16 +661,19 @@ const App: React.FC = () => {
             </div>
             <div className="flex items-center space-x-3">
               <button 
+                onClick={generateTasksPDF}
+                className="bg-white text-indigo-600 border border-indigo-200 px-6 py-3 rounded-2xl font-bold shadow-sm hover:bg-indigo-50 transition-all active:scale-95 flex items-center space-x-2"
+              >
+                <span>📄</span>
+                <span>Download PDF</span>
+              </button>
+              <button 
                 onClick={() => setIsGlobalTaskModalOpen(true)}
                 className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold shadow-xl hover:bg-indigo-700 transition-all active:scale-95 flex items-center space-x-2 border-b-4 border-indigo-800 hover:border-b-2 hover:translate-y-0.5"
               >
                 <span className="text-xl">+</span>
                 <span>Create Task</span>
               </button>
-              <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 flex items-center space-x-2">
-                <span className={`w-2 h-2 ${currentUser.role === 'super-admin' ? 'bg-red-500' : 'bg-indigo-500'} rounded-full animate-pulse`}></span>
-                <span className="text-sm font-bold text-indigo-900">{currentUser.name}</span>
-              </div>
             </div>
           </div>
 
@@ -658,7 +709,7 @@ const App: React.FC = () => {
                       <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-1">
                             <h4 className="font-bold text-slate-800 text-lg">{task.title}</h4>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${task.status === 'completed' ? 'bg-green-100 text-green-700' : task.status === 'blocked' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${task.status === 'completed' ? 'bg-green-100 text-green-700' : task.status === 'blocked' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
                               {task.status.replace('-', ' ')}
                             </span>
                             {linkedEvent && (

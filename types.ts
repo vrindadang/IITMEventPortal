@@ -71,7 +71,7 @@ export interface Attendee {
   designation: string;
   organization: string;
   seating_category: string;
-  def_touchpoint: string;
+  count: string;
   invited_by: string;
   created_at: string;
 }
