@@ -23,6 +23,7 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
     duration: ''
   });
   const [editingItem, setEditingItem] = useState<Partial<ScheduleItem>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isSuperAdmin = currentUser.role === 'super-admin';
 
@@ -33,7 +34,35 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
       .select('*')
       .order('s_no', { ascending: true });
     
-    if (data) setSchedule(data);
+    if (data) {
+      // Auto-adjust serial numbers if they are out of sync or contain gaps
+      const needsSync = data.some((item, index) => item.s_no !== index + 1);
+      
+      if (needsSync && isSuperAdmin) {
+        const syncedData = data.map((item, index) => ({
+          ...item,
+          s_no: index + 1
+        }));
+        
+        // Update database with normalized sequence
+        try {
+          const { error: syncError } = await supabase
+            .from('schedule')
+            .upsert(syncedData);
+          
+          if (!syncError) {
+            setSchedule(syncedData);
+          } else {
+            setSchedule(data);
+          }
+        } catch (e) {
+          console.error("Sync failed:", e);
+          setSchedule(data);
+        }
+      } else {
+        setSchedule(data);
+      }
+    }
     setLoading(false);
   };
 
@@ -43,44 +72,87 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
 
   const handleAddRow = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isSuperAdmin) return;
+    if (!isSuperAdmin || isSubmitting) return;
 
-    const { data, error } = await supabase
-      .from('schedule')
-      .insert([{
-        s_no: newItem.s_no,
-        time: newItem.time,
-        event_transit: newItem.event_transit,
-        duration: newItem.duration
-      }])
-      .select();
+    setIsSubmitting(true);
+    try {
+      const targetSNo = newItem.s_no || 1;
+      const existingAtOrAfter = schedule.filter(item => item.s_no >= targetSNo);
 
-    if (!error && data) {
-      setSchedule(prev => [...prev, data[0]].sort((a, b) => a.s_no - b.s_no));
-      setIsModalOpen(false);
-      setNewItem({ s_no: (schedule.length > 0 ? Math.max(...schedule.map(s => s.s_no)) : 0) + 1, time: '', event_transit: '', duration: '' });
+      // If we are inserting in the middle, we need to shift others
+      if (existingAtOrAfter.length > 0) {
+        const updates = existingAtOrAfter.map(item => ({
+          ...item,
+          s_no: item.s_no + 1
+        }));
+        
+        const { error: shiftError } = await supabase
+          .from('schedule')
+          .upsert(updates);
+        
+        if (shiftError) throw shiftError;
+      }
+
+      const { data, error } = await supabase
+        .from('schedule')
+        .insert([{
+          s_no: targetSNo,
+          time: newItem.time,
+          event_transit: newItem.event_transit,
+          duration: newItem.duration
+        }])
+        .select();
+
+      if (error) throw error;
+
+      if (data) {
+        // Refresh local state to ensure all S.Nos are correct
+        await fetchSchedule();
+        setIsModalOpen(false);
+        setNewItem({ 
+          s_no: (schedule.length > 0 ? Math.max(...schedule.map(s => s.s_no)) : 0) + 1, 
+          time: '', 
+          event_transit: '', 
+          duration: '' 
+        });
+      }
+    } catch (err) {
+      console.error("Error adding schedule row:", err);
+      alert("Failed to add row. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleUpdateRow = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isSuperAdmin || !editingItem.id) return;
+    if (!isSuperAdmin || !editingItem.id || isSubmitting) return;
 
-    const { data, error } = await supabase
-      .from('schedule')
-      .update({
-        s_no: editingItem.s_no,
-        time: editingItem.time,
-        event_transit: editingItem.event_transit,
-        duration: editingItem.duration
-      })
-      .eq('id', editingItem.id)
-      .select();
+    setIsSubmitting(true);
+    try {
+      const { data, error } = await supabase
+        .from('schedule')
+        .update({
+          s_no: editingItem.s_no,
+          time: editingItem.time,
+          event_transit: editingItem.event_transit,
+          duration: editingItem.duration
+        })
+        .eq('id', editingItem.id)
+        .select();
 
-    if (!error && data) {
-      setSchedule(prev => prev.map(item => item.id === editingItem.id ? data[0] : item).sort((a, b) => a.s_no - b.s_no));
-      setIsEditModalOpen(false);
-      setEditingItem({});
+      if (error) throw error;
+      
+      if (data) {
+        // Refetch to handle any manual S.No. changes that might create gaps
+        await fetchSchedule();
+        setIsEditModalOpen(false);
+        setEditingItem({});
+      }
+    } catch (err) {
+      console.error("Error updating schedule row:", err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -89,13 +161,34 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
     setIsEditModalOpen(true);
   };
 
+  const triggerInsertBefore = (item: ScheduleItem) => {
+    setNewItem({
+      s_no: item.s_no,
+      time: '',
+      event_transit: '',
+      duration: ''
+    });
+    setIsModalOpen(true);
+  };
+
+  const triggerInsertAfter = (item: ScheduleItem) => {
+    setNewItem({
+      s_no: item.s_no + 1,
+      time: '',
+      event_transit: '',
+      duration: ''
+    });
+    setIsModalOpen(true);
+  };
+
   const handleDelete = async (id: string) => {
     if (!isSuperAdmin) return;
-    if (!window.confirm("Are you sure you want to delete this schedule row?")) return;
+    if (!window.confirm("Are you sure you want to delete this schedule row? S.No. of all subsequent rows will be automatically adjusted to maintain the sequence.")) return;
     
     const { error } = await supabase.from('schedule').delete().eq('id', id);
     if (!error) {
-      setSchedule(prev => prev.filter(item => item.id !== id));
+      // Re-fetch will trigger the auto-sync logic to fix the gaps left by the deletion
+      await fetchSchedule();
     }
   };
 
@@ -113,7 +206,7 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
     autoTable(doc, {
       startY: 20 + (splitHeading.length * 7),
       head: [['S.No.', 'Time', 'Duration', 'Event / Transit']],
-      body: schedule.map(item => [item.s_no, item.time, item.duration, item.event_transit]),
+      body: schedule.map((item, index) => [index + 1, item.time, item.duration, item.event_transit]),
       headStyles: { 
         fillColor: [79, 70, 229], // Indigo-600
         textColor: [255, 255, 255],
@@ -141,7 +234,7 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
     setIsPdfModalOpen(false);
   };
 
-  if (loading) {
+  if (loading && schedule.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px]">
         <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
@@ -168,7 +261,10 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
                 <span>Download PDF</span>
               </button>
               <button 
-                onClick={() => setIsModalOpen(true)}
+                onClick={() => {
+                  setNewItem({ s_no: schedule.length + 1, time: '', event_transit: '', duration: '' });
+                  setIsModalOpen(true);
+                }}
                 className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all border-b-4 border-indigo-800 active:translate-y-0.5 active:border-b-0"
               >
                 + Add Schedule Row
@@ -187,19 +283,33 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
                 <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-r border-slate-100 w-48">Time</th>
                 <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-r border-slate-100 w-40">Duration</th>
                 <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-r border-slate-100">Event / Transit</th>
-                {isSuperAdmin && <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest w-24">Action</th>}
+                {isSuperAdmin && <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest w-48 text-center">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {schedule.length > 0 ? schedule.map((item) => (
+              {schedule.length > 0 ? schedule.map((item, index) => (
                 <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
-                  <td className="px-6 py-5 font-bold text-slate-400 border-r border-slate-50">{item.s_no}</td>
+                  <td className="px-6 py-5 font-bold text-slate-400 border-r border-slate-50">{index + 1}</td>
                   <td className="px-6 py-5 font-bold text-slate-800 border-r border-slate-50">{item.time}</td>
                   <td className="px-6 py-5 text-slate-500 font-bold border-r border-slate-50">{item.duration}</td>
                   <td className="px-6 py-5 text-slate-700 border-r border-slate-50 font-medium">{item.event_transit}</td>
                   {isSuperAdmin && (
                     <td className="px-6 py-5">
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center justify-center space-x-3">
+                        <button 
+                          onClick={() => triggerInsertBefore(item)}
+                          className="px-2 py-1 bg-green-50 text-green-600 rounded-lg text-[10px] font-black uppercase tracking-tighter hover:bg-green-600 hover:text-white transition-all border border-green-100"
+                          title="Insert New Row Before This"
+                        >
+                          Ins ↑
+                        </button>
+                        <button 
+                          onClick={() => triggerInsertAfter(item)}
+                          className="px-2 py-1 bg-green-50 text-green-600 rounded-lg text-[10px] font-black uppercase tracking-tighter hover:bg-green-600 hover:text-white transition-all border border-green-100"
+                          title="Insert New Row After This"
+                        >
+                          Ins ↓
+                        </button>
                         <button 
                           onClick={() => handleEditClick(item)}
                           className="text-indigo-400 hover:text-indigo-600 transition-colors"
@@ -231,19 +341,19 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
         </div>
       </div>
 
-      {/* Add Modal */}
+      {/* Add / Insert Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-indigo-100">
             <div className="p-6 bg-indigo-900 text-white flex justify-between items-center">
-              <h2 className="text-xl font-bold">Add Schedule Row</h2>
+              <h2 className="text-xl font-bold">Insert Schedule Row</h2>
               <button onClick={() => setIsModalOpen(false)} className="hover:bg-white/10 p-2 rounded-xl transition-colors">✕</button>
             </div>
             
             <form onSubmit={handleAddRow} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">S.No.</label>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">S.No. (Auto-adjusting)</label>
                   <input 
                     required
                     type="number" 
@@ -256,6 +366,7 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Time</label>
                   <input 
                     required
+                    autoFocus
                     type="text" 
                     placeholder="e.g. 10:30 AM"
                     value={newItem.time}
@@ -292,6 +403,7 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
               <div className="pt-4 flex space-x-3">
                 <button 
                   type="button" 
+                  disabled={isSubmitting}
                   onClick={() => setIsModalOpen(false)}
                   className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all"
                 >
@@ -299,9 +411,10 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-95 border-b-4 border-indigo-800"
+                  disabled={isSubmitting}
+                  className={`flex-1 py-3 font-bold rounded-2xl transition-all shadow-lg active:scale-95 border-b-4 ${isSubmitting ? 'bg-slate-300 border-slate-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-800'}`}
                 >
-                  Save Row
+                  {isSubmitting ? 'Shifting & Saving...' : 'Insert Row'}
                 </button>
               </div>
             </form>
@@ -370,6 +483,7 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
               <div className="pt-4 flex space-x-3">
                 <button 
                   type="button" 
+                  disabled={isSubmitting}
                   onClick={() => { setIsEditModalOpen(false); setEditingItem({}); }}
                   className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all"
                 >
@@ -377,9 +491,10 @@ const Schedule: React.FC<ScheduleProps> = ({ currentUser }) => {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-95 border-b-4 border-indigo-800"
+                  disabled={isSubmitting}
+                  className={`flex-1 py-3 font-bold rounded-2xl transition-all shadow-lg active:scale-95 border-b-4 ${isSubmitting ? 'bg-slate-300 border-slate-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-800'}`}
                 >
-                  Update Row
+                  {isSubmitting ? 'Updating...' : 'Update Row'}
                 </button>
               </div>
             </form>
