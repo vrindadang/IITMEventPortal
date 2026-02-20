@@ -147,7 +147,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate, curre
   const daysToGo = Math.ceil((new Date(EVENT_DATE).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#f8fafc] overflow-hidden">
+    <div className="h-screen flex flex-col md:flex-row bg-[#f8fafc] overflow-hidden">
       {/* Mobile Header */}
       <header className="md:hidden bg-[#1a1c3d] text-white px-5 py-4 flex justify-between items-center sticky top-0 z-50 border-b border-indigo-900/30">
         <div className="flex flex-col">
@@ -167,7 +167,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate, curre
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-[60] w-[280px] bg-[#1a1c3d] text-white transform transition-all duration-500 ease-in-out md:relative md:translate-x-0 flex flex-col border-r border-indigo-900/20
+        fixed inset-y-0 left-0 z-[60] w-[280px] bg-[#1a1c3d] text-white transform transition-all duration-500 ease-in-out md:sticky md:top-0 md:h-screen md:translate-x-0 flex flex-col border-r border-indigo-900/20
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full shadow-none'}
         ${isSidebarOpen ? 'shadow-[20px_0_60px_rgba(0,0,0,0.5)]' : ''}
       `}>

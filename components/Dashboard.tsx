@@ -154,7 +154,7 @@ const Dashboard: React.FC<DashboardProps> = ({ categories, overallProgress, onSe
                 
                 <div className="p-4 space-y-4">
                   {linkedTasks.length > 0 ? linkedTasks.map((task) => (
-                    <div key={task.id} className="bg-[#f8f9fa] rounded-[2rem] p-8 flex justify-between items-center group transition-all hover:bg-slate-100/50">
+                    <div key={task.id} className="bg-[#f8f9fa] rounded-[2rem] p-8 flex justify-between items-center group transition-all hover:bg-slate-100/50 border border-slate-200">
                       <div className="flex-1 pr-6">
                         <p className="font-bold text-slate-900 text-[1.2rem] leading-tight mb-1.5">{task.title}</p>
                         <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">{task.assignedTo.join(', ')}</p>

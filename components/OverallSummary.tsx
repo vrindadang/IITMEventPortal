@@ -73,7 +73,7 @@ const OverallSummary: React.FC<OverallSummaryProps> = ({
     <div className="space-y-12 animate-fadeIn pb-12">
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
+        <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
           <div className="flex justify-between items-start mb-6">
             <div className="bg-green-50 w-10 h-10 rounded-xl flex items-center justify-center text-green-600 border border-green-100 shadow-inner">✅</div>
             <span className="text-[9px] font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-full tracking-tighter uppercase border border-green-100">+3 this week</span>
@@ -82,7 +82,7 @@ const OverallSummary: React.FC<OverallSummaryProps> = ({
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] mt-3">Tasks Complete</p>
         </div>
 
-        <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
+        <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
           <div className="flex justify-between items-start mb-6">
             <div className="bg-indigo-50 w-10 h-10 rounded-xl flex items-center justify-center text-indigo-600 border border-indigo-100 shadow-inner">⌛</div>
             <span className="text-[9px] font-black text-indigo-400 bg-indigo-50 px-2 py-0.5 rounded-full tracking-tighter uppercase border border-indigo-100">{EVENT_DATE}</span>
@@ -91,7 +91,7 @@ const OverallSummary: React.FC<OverallSummaryProps> = ({
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] mt-3">Days Until Event</p>
         </div>
 
-        <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
+        <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
           <div className="flex justify-between items-start mb-6">
             <div className="bg-purple-50 w-10 h-10 rounded-xl flex items-center justify-center text-purple-600 border border-purple-100 shadow-inner">👥</div>
             <span className="text-[9px] font-black text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full tracking-tighter uppercase border border-purple-100">100% online</span>
@@ -100,7 +100,7 @@ const OverallSummary: React.FC<OverallSummaryProps> = ({
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] mt-3">Team Active</p>
         </div>
 
-        <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
+        <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
           <div className="flex justify-between items-start mb-6">
             <div className="bg-red-50 w-10 h-10 rounded-xl flex items-center justify-center text-red-600 border border-red-100 shadow-inner">⚠️</div>
             <span className="text-[9px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full tracking-tighter uppercase border border-red-100">Need focus</span>
@@ -111,7 +111,7 @@ const OverallSummary: React.FC<OverallSummaryProps> = ({
       </div>
 
       {/* Overall Event Progress Card */}
-      <div className="bg-white rounded-[3rem] p-12 md:p-14 shadow-[0_20px_60px_rgba(0,0,0,0.03)] border border-slate-100 overflow-hidden relative">
+      <div className="bg-white rounded-[3rem] p-12 md:p-14 shadow-[0_20px_60px_rgba(0,0,0,0.03)] border border-slate-200 overflow-hidden relative">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 relative z-10">
           <div>
             <h2 className="font-classy-serif text-[3rem] text-slate-900 leading-tight tracking-tight">Overall Event Progress</h2>
@@ -139,7 +139,7 @@ const OverallSummary: React.FC<OverallSummaryProps> = ({
           { label: 'During Event', stats: duringEvent, color: 'blue' },
           { label: 'Post-Event', stats: postEvent, color: 'slate' }
         ].map((phase, idx) => (
-          <div key={idx} className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm transition-all hover:shadow-md group">
+          <div key={idx} className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm transition-all hover:shadow-md group">
             <div className="flex justify-between items-center mb-8">
               <h3 className="font-classy-serif text-2xl text-slate-800 tracking-tight">{phase.label}</h3>
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{phase.stats.count} Categories</span>
@@ -159,7 +159,7 @@ const OverallSummary: React.FC<OverallSummaryProps> = ({
       </div>
 
       {/* Category Progress List */}
-      <div className="bg-white rounded-[3rem] border border-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.03)] overflow-hidden">
+      <div className="bg-white rounded-[3rem] border border-slate-200 shadow-[0_20px_60px_rgba(0,0,0,0.03)] overflow-hidden">
         <div className="p-10 md:p-12 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <h2 className="font-classy-serif text-[2.4rem] text-slate-900 tracking-tight">Category Progress</h2>
           <div className="relative w-full md:w-96">
@@ -225,7 +225,7 @@ const OverallSummary: React.FC<OverallSummaryProps> = ({
       </div>
 
       {/* Live Activity Feed */}
-      <div className="bg-white rounded-[3rem] border border-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.03)] p-12 md:p-14">
+      <div className="bg-white rounded-[3rem] border border-slate-200 shadow-[0_20px_60px_rgba(0,0,0,0.03)] p-12 md:p-14">
         <div className="flex items-center space-x-4 mb-12">
           <div className="w-3 h-3 rounded-full bg-indigo-500 animate-ping" />
           <h2 className="font-classy-serif text-[2.4rem] text-slate-900 tracking-tight">Live Activity Feed</h2>

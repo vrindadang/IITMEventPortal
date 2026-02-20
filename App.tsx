@@ -80,6 +80,9 @@ const App: React.FC = () => {
   // State for Task Editing Modal (Super Admin or Task Owner)
   const [taskBeingEdited, setTaskBeingEdited] = useState<Task | null>(null);
 
+  // State for active dropdown in task list
+  const [activeDropdownTaskId, setActiveDropdownTaskId] = useState<string | null>(null);
+
   // Helper to check if current user is authorized to modify a specific task
   const isAuthorizedForTask = (task: Task) => {
     if (!currentUser) return false;
@@ -254,6 +257,15 @@ const App: React.FC = () => {
     
     return filtered;
   }, [tasks, activeView, currentUser, taskSearchQuery]);
+
+  const taskStats = useMemo(() => {
+    return {
+      total: currentVisibleTasks.length,
+      inProgress: currentVisibleTasks.filter(t => t.status === 'in-progress').length,
+      completed: currentVisibleTasks.filter(t => t.status === 'completed').length,
+      notStarted: currentVisibleTasks.filter(t => t.status === 'not-started').length,
+    };
+  }, [currentVisibleTasks]);
 
   const generateTasksPDF = () => {
     const doc = new jsPDF();
@@ -526,6 +538,15 @@ const App: React.FC = () => {
     setTaskBeingEdited({ ...taskBeingEdited, assignedTo: next });
   };
 
+  const toggleGlobalAssignee = (name: string) => {
+    if (currentUser?.role !== 'super-admin') return;
+    const current = globalNewTask.assignedTo || [];
+    const next = current.includes(name)
+      ? current.filter(n => n !== name)
+      : [...current, name];
+    setGlobalNewTask(prev => ({ ...prev, assignedTo: next }));
+  };
+
   const handleDeleteTask = async (taskId: string) => {
     if (!currentUser) return;
     const taskToDelete = tasks.find(t => t.id === taskId);
@@ -630,125 +651,210 @@ const App: React.FC = () => {
 
       {(activeView === 'tasks' || activeView === 'my-tasks-sub' || activeView === 'overall-tasks-list') && (
         <div className="space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-            <div>
-              <h2 className="text-3xl font-bold text-slate-800">
-                {activeView === 'my-tasks-sub' ? 'My Tasks' : (activeView === 'overall-tasks-list' ? 'Overall Tasks' : (currentUser.role === 'super-admin' ? 'Task Management' : 'Event Tasks'))}
-              </h2>
-              <p className="text-slate-500">
-                {activeView === 'my-tasks-sub' 
-                  ? 'Your personal responsibilities and assigned tasks.' 
-                  : (activeView === 'overall-tasks-list' ? 'Unfiltered view of all project contributions.' : 'Complete overview of tasks for the IIT-M project.')}
-              </p>
+          {(activeView === 'overall-tasks-list' || activeView === 'my-tasks-sub') ? (
+            <div className="space-y-8">
+              {/* New Tasks Header */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-center gap-8">
+                  <div className="text-6xl font-black text-indigo-600 select-none">{taskStats.total}</div>
+                  <div className="h-16 w-px bg-slate-200 hidden md:block" />
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-900">
+                      {activeView === 'my-tasks-sub' ? 'My Tasks' : 'Overall Tasks'}
+                    </h2>
+                    <p className="text-slate-400 font-medium">
+                      {activeView === 'my-tasks-sub' 
+                        ? 'Your personal responsibilities and assigned tasks.' 
+                        : 'Unfiltered view of all project contributions.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={generateTasksPDF}
+                    className="bg-white text-slate-600 border border-slate-200 px-6 py-3 rounded-xl font-bold shadow-sm hover:bg-slate-50 transition-all active:scale-95 flex items-center space-x-2"
+                  >
+                    <span className="text-slate-400">↓</span>
+                    <span>Download PDF</span>
+                  </button>
+                  <button 
+                    onClick={() => setIsGlobalTaskModalOpen(true)}
+                    className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all active:scale-95 flex items-center space-x-2"
+                  >
+                    <span className="text-xl">+</span>
+                    <span>Create Task</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Stat Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-center">
+                  <p className="text-2xl font-black text-indigo-600 mb-1">{taskStats.total}</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total</p>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-center">
+                  <p className="text-2xl font-black text-amber-500 mb-1">{taskStats.inProgress}</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">In Progress</p>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-center">
+                  <p className="text-2xl font-black text-green-500 mb-1">{taskStats.completed}</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Completed</p>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-center">
+                  <p className="text-2xl font-black text-slate-400 mb-1">{taskStats.notStarted}</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Not Started</p>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center space-x-3">
-              <button 
-                onClick={generateTasksPDF}
-                className="bg-white text-indigo-600 border border-indigo-200 px-6 py-3 rounded-2xl font-bold shadow-sm hover:bg-indigo-50 transition-all active:scale-95 flex items-center space-x-2"
-              >
-                <span>📄</span>
-                <span>Download PDF</span>
-              </button>
-              <button 
-                onClick={() => setIsGlobalTaskModalOpen(true)}
-                className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold shadow-xl hover:bg-indigo-700 transition-all active:scale-95 flex items-center space-x-2 border-b-4 border-indigo-800 hover:border-b-2 hover:translate-y-0.5"
-              >
-                <span className="text-xl">+</span>
-                <span>Create Task</span>
-              </button>
+          ) : (
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-3xl font-bold text-slate-800 flex items-center gap-3">
+                  <span>{currentUser.role === 'super-admin' ? 'Task Management' : 'Event Tasks'}</span>
+                  <span className="bg-slate-100 text-slate-500 text-sm px-3 py-1 rounded-full border border-slate-200">{currentVisibleTasks.length}</span>
+                </h2>
+                <p className="text-slate-500">
+                  Complete overview of tasks for the IIT-M project.
+                </p>
+              </div>
+              <div className="flex items-center space-x-3">
+                <button 
+                  onClick={generateTasksPDF}
+                  className="bg-white text-indigo-600 border border-indigo-200 px-6 py-3 rounded-2xl font-bold shadow-sm hover:bg-indigo-50 transition-all active:scale-95 flex items-center space-x-2"
+                >
+                  <span>📄</span>
+                  <span>Download PDF</span>
+                </button>
+                <button 
+                  onClick={() => setIsGlobalTaskModalOpen(true)}
+                  className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold shadow-xl hover:bg-indigo-700 transition-all active:scale-95 flex items-center space-x-2 border-b-4 border-indigo-800 hover:border-b-2 hover:translate-y-0.5"
+                >
+                  <span className="text-xl">+</span>
+                  <span>Create Task</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Search Bar for Tasks */}
-          <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm mb-6">
-            <div className="relative">
+          <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm mb-6">
+            <div className="relative flex items-center">
+              <span className="absolute left-4 text-indigo-500 text-lg">🔍</span>
               <input 
                 type="text" 
                 placeholder="Search tasks..."
                 value={taskSearchQuery}
                 onChange={(e) => setTaskSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm font-medium"
+                className="w-full pl-12 pr-4 py-3 bg-transparent focus:outline-none text-sm font-medium text-slate-600 placeholder:text-slate-400"
               />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">🔍</span>
             </div>
           </div>
           
-          <div className="grid grid-cols-1 gap-12 max-w-2xl mx-auto">
+          <div className="space-y-4 max-w-5xl mx-auto">
              {currentVisibleTasks.length > 0 ? (
-               currentVisibleTasks.map(task => {
+               currentVisibleTasks.map((task, index) => {
                   const linkedEvent = schedule.find(s => s.id === task.scheduleItemId);
                   const isMine = isAuthorizedForTask(task);
                   const categoryName = updatedCategories.find(c => c.id === task.categoryId)?.name || 'Uncategorized';
+                  const isDropdownOpen = activeDropdownTaskId === task.id;
                   
                   return (
-                    <div key={task.id} className="bg-white rounded-[3rem] p-10 md:p-12 border border-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.04)] flex flex-col animate-fadeIn transition-all hover:shadow-[0_30px_80px_rgba(0,0,0,0.06)] relative overflow-hidden group">
+                    <div key={task.id} className="bg-white rounded-2xl p-6 border border-slate-200 border-l-4 border-l-indigo-500 shadow-sm flex flex-col animate-fadeIn transition-all hover:shadow-md relative overflow-visible group">
                       
-                      {/* Title - Large Serif Typography */}
-                      <h4 className="font-classy-serif text-[2.8rem] text-[#1a1a1a] leading-[1.05] mb-6 tracking-tight group-hover:text-indigo-900 transition-colors">
-                        {task.title}
-                      </h4>
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-start space-x-4">
+                          {/* Numbering */}
+                          <span className="text-sm font-bold text-slate-900 mt-1">{(index + 1).toString().padStart(2, '0')}</span>
+                          
+                          <div className="flex flex-col">
+                            {/* Title */}
+                            <h4 className="text-lg font-bold text-slate-800 leading-tight mb-1 group-hover:text-indigo-600 transition-colors">
+                              {task.title}
+                            </h4>
+                            
+                            {/* Metadata Row */}
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
+                              <span className="text-indigo-600">{categoryName}</span>
+                              {(!(activeView === 'my-tasks-sub' && currentUser.role !== 'super-admin')) && (
+                                <>
+                                  <span className="text-slate-900">•</span>
+                                  <span className="text-slate-900">{task.assignedTo.join(', ')}</span>
+                                </>
+                              )}
+                              {linkedEvent && (
+                                <>
+                                  <span className="text-slate-900">•</span>
+                                  <span className="text-slate-900">Linked: {linkedEvent.event_transit}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
 
-                      {/* Status Badges Row (NOT STARTED, LINKED EVENT) */}
-                      <div className="flex flex-col items-start gap-1.5 mb-10">
-                        <span className="text-[11px] font-black text-[#4361ee] uppercase tracking-[0.2em] leading-none">
-                          {task.status.replace('-', ' ')}
-                        </span>
-                        {linkedEvent && (
-                          <span className="text-[11px] font-black text-[#8a2be2] uppercase tracking-[0.2em] leading-none opacity-90">
-                            LINKED: {linkedEvent.event_transit.toUpperCase()}
-                          </span>
+                        {/* Dropdown Trigger */}
+                        {(currentUser.role === 'super-admin' || activeView !== 'overall-tasks-list') && (
+                          <div className="relative">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveDropdownTaskId(isDropdownOpen ? null : task.id);
+                              }}
+                              className="p-2 text-slate-900 hover:text-indigo-600 transition-colors"
+                            >
+                              <span className={`text-xs transition-transform duration-300 block ${isDropdownOpen ? 'rotate-180' : ''}`}>›</span>
+                            </button>
+                            
+                            {isDropdownOpen && (
+                              <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-50 animate-fadeIn">
+                                <button 
+                                  disabled={!isMine}
+                                  onClick={() => {
+                                    handleUpdateTask(task);
+                                    setActiveDropdownTaskId(null);
+                                  }}
+                                  className={`w-full px-6 py-3 text-left text-sm font-bold flex items-center space-x-3 transition-colors ${!isMine ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-600'}`}
+                                >
+                                  <span>📈</span>
+                                  <span>Update Progress</span>
+                                </button>
+                                <button 
+                                  disabled={!isMine}
+                                  onClick={() => {
+                                    setTaskBeingEdited(task);
+                                    setActiveDropdownTaskId(null);
+                                  }}
+                                  className={`w-full px-6 py-3 text-left text-sm font-bold flex items-center space-x-3 transition-colors ${!isMine ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-600'}`}
+                                >
+                                  <span>✏️</span>
+                                  <span>Edit Details</span>
+                                </button>
+                                <div className="h-px bg-slate-50 my-1" />
+                                <button 
+                                  disabled={!isMine}
+                                  onClick={() => {
+                                    handleDeleteTask(task.id);
+                                    setActiveDropdownTaskId(null);
+                                  }}
+                                  className={`w-full px-6 py-3 text-left text-sm font-bold flex items-center space-x-3 transition-colors ${!isMine ? 'text-slate-300 cursor-not-allowed' : 'text-red-500 hover:bg-red-50'}`}
+                                >
+                                  <span>🗑️</span>
+                                  <span>Delete Task</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
 
-                      {/* Unified Info Container - Light Grey/Beige Rounded Box */}
-                      <div className="bg-[#f5f5f5] rounded-[2rem] p-8 grid grid-cols-2 gap-8 mb-10">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] mb-2.5">CATEGORY</span>
-                          <span className="text-sm font-bold text-[#8a2be2] leading-tight">{categoryName}</span>
+                      {/* Progress Area */}
+                      <div className="relative pt-2">
+                        <div className="flex justify-end mb-1">
+                          <span className="text-[10px] font-bold text-slate-900">{task.progress}%</span>
                         </div>
-                        <div className="flex flex-col border-l border-slate-200 pl-8">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] mb-2.5">ASSIGNED</span>
-                          <span className="text-sm font-bold text-[#1a1a1a]">{task.assignedTo.join(', ')}</span>
+                        <div className="w-full bg-slate-100 h-[2px] rounded-full overflow-hidden">
+                          <div className="bg-indigo-400 h-full transition-all duration-1000 ease-in-out" style={{ width: `${task.progress}%` }} />
                         </div>
-                      </div>
-
-                      {/* Progress Area - Massive Percentage with Thin Line */}
-                      <div className="space-y-4 mb-12">
-                         <div className="flex justify-between items-baseline">
-                            <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.25em]">PROGRESS</span>
-                            <div className="flex items-baseline font-classy-serif leading-none">
-                              <span className="text-6xl text-[#1a1a1a] font-normal tracking-tighter">{task.progress}</span>
-                              <span className="text-3xl text-[#1a1a1a] opacity-30 ml-0.5">%</span>
-                            </div>
-                         </div>
-                         <div className="w-full bg-[#eeeeee] h-[1px] rounded-full overflow-hidden">
-                            <div className="bg-[#4361ee] h-full transition-all duration-1000 ease-in-out" style={{ width: `${task.progress}%` }} />
-                         </div>
-                      </div>
-
-                      {/* Three-Button Tab Action Row (Blue, White, Pink) */}
-                      <div className="flex items-center gap-4 w-full">
-                        <button 
-                          disabled={!isMine}
-                          onClick={() => handleUpdateTask(task)}
-                          className={`flex-1 py-5 rounded-full font-bold text-sm transition-all shadow-[0_15px_30px_rgba(67,97,238,0.15)] active:scale-[0.97] ${!isMine ? 'bg-slate-50 text-slate-300 cursor-not-allowed shadow-none' : 'bg-[#4361ee] text-white hover:bg-[#324ccf]'}`}
-                        >
-                          Update Progress
-                        </button>
-                        <button 
-                          disabled={!isMine}
-                          onClick={() => setTaskBeingEdited(task)}
-                          className={`flex-1 py-5 rounded-full font-bold text-sm transition-all border border-slate-200 active:scale-[0.97] bg-white ${!isMine ? 'text-slate-200 cursor-not-allowed border-slate-100' : 'text-slate-600 hover:bg-slate-50'}`}
-                        >
-                          Edit Details
-                        </button>
-                        <button 
-                          disabled={!isMine}
-                          onClick={() => handleDeleteTask(task.id)}
-                          className={`flex-1 py-5 rounded-full font-bold text-sm transition-all shadow-sm active:scale-[0.97] ${!isMine ? 'bg-slate-50 text-slate-200 cursor-not-allowed' : 'bg-[#fde4e9] text-[#f95d7e] hover:bg-[#fad1d9]'}`}
-                        >
-                          Delete Task
-                        </button>
                       </div>
                     </div>
                   );
@@ -911,6 +1017,30 @@ const App: React.FC = () => {
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Description</label>
                 <textarea value={globalNewTask.description} onChange={e => setGlobalNewTask(prev => ({ ...prev, description: e.target.value }))} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none h-24 resize-none transition-all" />
               </div>
+
+              {currentUser.role === 'super-admin' && (
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Assign To</label>
+                  <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto p-1 custom-scrollbar">
+                    {users.map(u => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => toggleGlobalAssignee(u.name)}
+                        className={`
+                          px-3 py-1.5 rounded-full text-[10px] font-black transition-all border uppercase tracking-wider
+                          ${globalNewTask.assignedTo?.includes(u.name) 
+                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
+                            : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300'}
+                        `}
+                      >
+                        {u.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="pt-4 flex space-x-3">
                 <button type="button" onClick={() => setIsGlobalTaskModalOpen(false)} className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all">Cancel</button>
                 <button type="submit" className={`flex-1 py-4 font-bold rounded-2xl transition-all shadow-lg active:scale-95 border-b-4 ${isAddingNewCategory ? 'bg-slate-300 border-slate-400 cursor-not-allowed opacity-50' : 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-800'}`}>Save Task</button>
