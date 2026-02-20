@@ -517,6 +517,15 @@ const App: React.FC = () => {
     }
   };
 
+  const toggleEditAssignee = (name: string) => {
+    if (!taskBeingEdited || currentUser?.role !== 'super-admin') return;
+    const current = taskBeingEdited.assignedTo || [];
+    const next = current.includes(name)
+      ? current.filter(n => n !== name)
+      : [...current, name];
+    setTaskBeingEdited({ ...taskBeingEdited, assignedTo: next });
+  };
+
   const handleDeleteTask = async (taskId: string) => {
     if (!currentUser) return;
     const taskToDelete = tasks.find(t => t.id === taskId);
@@ -935,6 +944,29 @@ const App: React.FC = () => {
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Description</label>
                 <textarea value={taskBeingEdited.description} onChange={e => setTaskBeingEdited({ ...taskBeingEdited, description: e.target.value })} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none h-24 resize-none" />
               </div>
+
+              {currentUser.role === 'super-admin' && (
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Assign To</label>
+                  <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto p-1 custom-scrollbar">
+                    {users.map(u => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => toggleEditAssignee(u.name)}
+                        className={`
+                          px-3 py-1.5 rounded-full text-[10px] font-black transition-all border uppercase tracking-wider
+                          ${taskBeingEdited.assignedTo?.includes(u.name) 
+                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
+                            : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300'}
+                        `}
+                      >
+                        {u.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="pt-4 flex space-x-3">
                 <button type="button" onClick={() => setTaskBeingEdited(null)} className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all">Cancel</button>
                 <button type="submit" className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg border-b-4 border-indigo-800">Update Task</button>
