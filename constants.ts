@@ -25,4 +25,31 @@ export const CATEGORIES: Category[] = [
   { id: 'cat-007', name: 'Event Highlights Sharing', phase: 'post-event', responsiblePersons: ['Digital Team', 'Ashwani Sachdeva (President)'], progress: 0, status: 'not-started', dueDate: '2026-03-15', priority: 'medium' },
 ];
 
-export const TASKS: Task[] = [];
+export const TASKS: Task[] = [
+  {
+    id: 'task-1',
+    categoryId: 'cat-001',
+    title: 'Provide details of SKRM cars (authorised)',
+    description: 'Coordinate with logistics for car details.',
+    assignedTo: ['Mr. Anmol'],
+    status: 'not-started',
+    progress: 0,
+    dueDate: '2026-03-05',
+    updates: [],
+    scheduleItemId: '',
+    attachments: []
+  },
+  {
+    id: 'task-2',
+    categoryId: 'cat-002',
+    title: 'Entry Gate to be mentioned on Card for Sangat and Non-Sangat',
+    description: 'Update invitation card designs.',
+    assignedTo: ['Ms. Sanchi'],
+    status: 'not-started',
+    progress: 0,
+    dueDate: '2026-03-01',
+    updates: [],
+    scheduleItemId: '',
+    attachments: []
+  }
+];

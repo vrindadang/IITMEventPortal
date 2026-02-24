@@ -194,7 +194,7 @@ const App: React.FC = () => {
     };
 
     fetchData();
-  }, [activeView]); 
+  }, []); 
 
   const updatedCategories = useMemo(() => {
     return categories.map(cat => {
